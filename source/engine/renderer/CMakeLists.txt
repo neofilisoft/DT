@@ -21,6 +21,7 @@ target_link_libraries(dt_renderer PUBLIC
     dt_vulkan
     dt_imgui
     dt_imguizmo
+    dt_zlib
 )
 
 set_target_properties(dt_renderer PROPERTIES FOLDER "engine")
