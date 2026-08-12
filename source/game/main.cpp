@@ -27,7 +27,18 @@ int main()
 {
     using namespace dt;
 
+    // Debug builds keep a console window (WIN32_EXECUTABLE FALSE in CMake)
+    // and write log output there so developers can see DT_LOG_* messages live
+    // without opening a log file.
+    //
+    // Release/non-debug builds use WIN32_EXECUTABLE TRUE (no console window
+    // pops up), so we route logging to a file instead. The file is written
+    // next to the .exe so it is easy to find after a crash report.
+#if defined(DT_CONSOLE_ENABLED)
     Logger::Get().AddSink(std::make_unique<ConsoleLogSink>());
+#else
+    Logger::Get().AddSink(std::make_unique<FileLogSink>("Domaintic.log"));
+#endif
     Logger::Get().SetMinLevel(LogCategory::Core, LogLevel::Info);
     Logger::Get().SetMinLevel(LogCategory::Simulation, LogLevel::Info);
     Logger::Get().SetMinLevel(LogCategory::Renderer, LogLevel::Info);
