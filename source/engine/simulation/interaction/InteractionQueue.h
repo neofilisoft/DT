@@ -145,9 +145,7 @@ namespace dt::sim
 
         // Advances the front interaction by exactly one tick, driving its
         // real Lua run-function via ScriptCoroutine (see ScriptCoroutine.h
-        // for the yield/return contract). This replaces the M3 milestone's
-        // "instant resolution by matching InteractionDef::name in C++"
-        // placeholder - as of this milestone, the front interaction's
+        // for the yield/return contract). The front interaction's
         // actual luaRunFunction executes, potentially across multiple
         // ticks via coroutine.yield("continue").
         //
