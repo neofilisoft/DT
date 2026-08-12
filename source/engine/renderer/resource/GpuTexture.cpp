@@ -5,6 +5,7 @@
 #include "core/logging/Logger.h"
 #include "core/platform/Assert.h"
 #include <fstream>
+#include <zlib.h>
 
 namespace dt::renderer
 {
@@ -182,12 +183,19 @@ namespace dt::renderer
             char magic[4];
             u32 version;
             u32 type;
+            u32 isCompressed;
+            u32 uncompressedSize;
         } header;
 
         file.read(reinterpret_cast<char*>(&header), sizeof(header));
         if (header.magic[0] != 'D' || header.magic[1] != 'T' || header.magic[2] != 'A' || header.magic[3] != 'S')
         {
             DT_LOG_ERROR(LogCategory::Renderer, "GpuTexture: invalid magic in file '{}'", path);
+            return false;
+        }
+        if (header.version != 2)
+        {
+            DT_LOG_ERROR(LogCategory::Renderer, "GpuTexture: unsupported asset version {} in file '{}' (expected 2)", header.version, path);
             return false;
         }
         if (header.type != 1)
@@ -206,7 +214,28 @@ namespace dt::renderer
 
         u32 dataSize = texHeader.width * texHeader.height * 4;
         std::vector<u8> pixels(dataSize);
-        file.read(reinterpret_cast<char*>(pixels.data()), dataSize);
+        
+        if (header.isCompressed == 1)
+        {
+            std::streamsize compressedSize = file.seekg(0, std::ios::end).tellg() - static_cast<std::streampos>(sizeof(header) + sizeof(texHeader));
+            file.seekg(sizeof(header) + sizeof(texHeader), std::ios::beg);
+            
+            std::vector<uint8_t> compressedData(compressedSize);
+            file.read(reinterpret_cast<char*>(compressedData.data()), compressedSize);
+            
+            uLongf destLen = header.uncompressedSize;
+            int zResult = uncompress(pixels.data(), &destLen, compressedData.data(), compressedSize);
+            
+            if (zResult != Z_OK || destLen != header.uncompressedSize)
+            {
+                DT_LOG_ERROR(LogCategory::Renderer, "GpuTexture: failed to decompress payload in file '{}'", path);
+                return false;
+            }
+        }
+        else
+        {
+            file.read(reinterpret_cast<char*>(pixels.data()), dataSize);
+        }
 
         if (!Initialize(ctx, allocator, texHeader.width, texHeader.height, VK_FORMAT_R8G8B8A8_UNORM))
         {

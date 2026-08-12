@@ -5,6 +5,8 @@
 #include "core/logging/Logger.h"
 #include "core/platform/Assert.h"
 #include <fstream>
+#include <cstring>
+#include <zlib.h>
 
 namespace dt::renderer
 {
@@ -102,12 +104,19 @@ namespace dt::renderer
             char magic[4];
             u32 version;
             u32 type;
+            u32 isCompressed;
+            u32 uncompressedSize;
         } header;
 
         file.read(reinterpret_cast<char*>(&header), sizeof(header));
         if (header.magic[0] != 'D' || header.magic[1] != 'T' || header.magic[2] != 'A' || header.magic[3] != 'S')
         {
             DT_LOG_ERROR(LogCategory::Renderer, "GpuMesh: invalid magic in file '{}'", path);
+            return false;
+        }
+        if (header.version != 2)
+        {
+            DT_LOG_ERROR(LogCategory::Renderer, "GpuMesh: unsupported asset version {} in file '{}' (expected 2)", header.version, path);
             return false;
         }
         if (header.type != 2)
@@ -127,17 +136,48 @@ namespace dt::renderer
         VkDeviceSize indexSize = meshHeader.indexCount * sizeof(uint32_t);
 
         std::vector<Vertex> vertices(meshHeader.vertexCount);
-        file.read(reinterpret_cast<char*>(vertices.data()), vertexSize);
-
         std::vector<uint32_t> indices(meshHeader.indexCount);
-        if (indexSize > 0)
+
+        if (header.isCompressed == 1)
         {
-            file.read(reinterpret_cast<char*>(indices.data()), indexSize);
+            // Read compressed data
+            std::streamsize compressedSize = file.seekg(0, std::ios::end).tellg() - static_cast<std::streampos>(sizeof(header) + sizeof(meshHeader));
+            file.seekg(sizeof(header) + sizeof(meshHeader), std::ios::beg);
+            
+            std::vector<uint8_t> compressedData(compressedSize);
+            file.read(reinterpret_cast<char*>(compressedData.data()), compressedSize);
+            
+            // Uncompress directly into a temporary payload buffer
+            std::vector<uint8_t> uncompressedData(header.uncompressedSize);
+            uLongf destLen = header.uncompressedSize;
+            int zResult = uncompress(uncompressedData.data(), &destLen, compressedData.data(), compressedSize);
+            
+            if (zResult != Z_OK || destLen != header.uncompressedSize)
+            {
+                DT_LOG_ERROR(LogCategory::Renderer, "GpuMesh: failed to decompress payload in file '{}'", path);
+                return false;
+            }
+            
+            // Copy out of payload buffer
+            std::memcpy(vertices.data(), uncompressedData.data(), vertexSize);
+            if (indexSize > 0)
+            {
+                std::memcpy(indices.data(), uncompressedData.data() + vertexSize, indexSize);
+            }
+        }
+        else
+        {
+            // Read uncompressed data
+            file.read(reinterpret_cast<char*>(vertices.data()), vertexSize);
+            if (indexSize > 0)
+            {
+                file.read(reinterpret_cast<char*>(indices.data()), indexSize);
+            }
         }
 
         m_indexCount = meshHeader.indexCount;
         
-        if (!Initialize(ctx, allocator, meshHeader.vertexCount * sizeof(Vertex), m_indexCount * sizeof(u32)))
+        if (!Initialize(ctx, allocator, vertexSize, indexSize))
         {
             return false;
         }
