@@ -78,7 +78,7 @@ add_subdirectory(source/game)
 # Tools
 # ---------------------------------------------------------------------------
 add_executable(DTCooker source/tools/cooker/main.cpp)
-target_link_libraries(DTCooker PRIVATE dt_tinygltf dt_stb)
+target_link_libraries(DTCooker PRIVATE dt_tinygltf dt_stb dt_zlib)
 set_target_properties(DTCooker PROPERTIES FOLDER "tools")
 
 if(DT_BUILD_TESTS)
