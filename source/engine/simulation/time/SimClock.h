@@ -33,7 +33,7 @@ namespace dt::sim
     // real-time at x1. This ratio is content tuning, not an engine
     // constant - exposed here as the single place it's defined so Domaintic
     // can retune pacing without touching engine code, but it is NOT wired
-    // through Config yet (M3 scope is TaskGraph wiring; Config-driven
+    // through Config yet (Config-driven
     // tuning is a follow-up, not assumed done here).
     inline constexpr u64 kTicksPerGameMinute = 25;
     inline constexpr u64 kGameMinutesPerHour = 60;

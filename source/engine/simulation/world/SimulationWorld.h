@@ -8,6 +8,7 @@
 #include "runtime/SimulationLoop.h"
 #include "runtime/SimulationSnapshot.h"
 #include "scripting/ScriptEngine.h"
+#include "simulation/animation/VisualComponent.h"
 #include "simulation/autonomy/AutonomySystem.h"
 #include "simulation/interaction/InteractionQueue.h"
 #include "simulation/needs/NeedsComponent.h"
@@ -113,6 +114,7 @@ namespace dt::sim
         ComponentArray<Entity, InteractableComponent>& Interactables() { return m_interactables; }
         ComponentArray<Entity, NeedsComponent>& Needs() { return m_needs; }
         ComponentArray<Entity, InteractionQueue>& Queues() { return m_queues; }
+        ComponentArray<Entity, VisualComponent>& Visuals() { return m_visuals; }
 
         script::ScriptEngine& Scripting() { return m_scriptEngine; }
 
@@ -149,6 +151,7 @@ namespace dt::sim
         ComponentArray<Entity, InteractionQueue> m_queues;
         ComponentArray<Entity, TransformComponent> m_transforms;
         ComponentArray<Entity, InteractableComponent> m_interactables;
+        ComponentArray<Entity, VisualComponent> m_visuals;
 
         std::array<NeedDefinition, kNeedCount> m_needDefinitions;
         GlobalInteractionPool m_globalInteractions;

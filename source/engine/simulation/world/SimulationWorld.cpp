@@ -1,4 +1,7 @@
 #include "simulation/world/SimulationWorld.h"
+#include "simulation/animation/AnimationSystem.h"
+#include "core/input/InputManager.h"
+#include "core/profiler/Profiler.h"
 #include "core/logging/Logger.h"
 #include "simulation/spatial/SpatialSystem.h"
 
@@ -23,7 +26,7 @@ namespace dt::sim
 
     namespace
     {
-        // M4's concrete global interaction content - "Rest" and
+        // Concrete global interaction content - "Rest" and
         // "GrabASnack", the two always-available actions a Sim can perform
         // with no object/spatial dependency. Their satisfaction weighting
         // (used for autonomy SCORING, kept in fast C++ per AutonomySystem's
@@ -40,9 +43,7 @@ namespace dt::sim
         // real .lua file loaded through FileSystem/ScriptEngine::LoadFile,
         // and ownership likely shifts to game-layer content (Domaintic
         // authoring its own Rest/GrabASnack variants) rather than being
-        // hardcoded engine behavior - flagged the same way the M3 note
-        // flagged the previous placeholder, not silently treated as
-        // permanent.
+        // hardcoded engine behavior.
         //
         // Lua-side contract: dt.get_need(entity, needName) -> number,
         // dt.satisfy_need(entity, needName, amount) -> nil are the bound
@@ -131,6 +132,11 @@ end
             transform.x = static_cast<f32>(i % 4) * 2.0f;
             transform.z = static_cast<f32>(i / 4) * 2.0f;
             m_transforms.Add(e, transform);
+
+            VisualComponent visual;
+            visual.visualId = 1; // Default to some test sprite/mesh
+            dt::sim::AnimationSystem::SetupSpriteAnimation(visual, AnimationState::Idle);
+            m_visuals.Add(e, visual);
         }
 
         RegisterLuaBindings();
@@ -215,6 +221,47 @@ end
             if (m_playSoundCallback)
                 m_playSoundCallback(path);
         });
+
+        dtEngine.set_function("set_animation_state", [this](Entity entity, const std::string& stateName)
+        {
+            VisualComponent* visual = m_visuals.Get(entity);
+            if (visual == nullptr)
+            {
+                DT_LOG_WARN(LogCategory::Scripting, "dt_engine.set_animation_state: entity has no VisualComponent");
+                return;
+            }
+
+            AnimationState state = AnimationState::Idle;
+            if (stateName == "Walk") state = AnimationState::Walk;
+            else if (stateName == "Interact") state = AnimationState::Interact;
+            else if (stateName == "Idle") state = AnimationState::Idle;
+            else
+            {
+                DT_LOG_WARN(LogCategory::Scripting, "dt_engine.set_animation_state: unknown state '{}'", stateName);
+                return;
+            }
+
+            dt::sim::AnimationSystem::SetupSpriteAnimation(*visual, state);
+        });
+
+        // Input bindings - scripts can poll action state without knowing the device.
+        // Action names match input.ini (e.g. "Interact", "Jump", "MoveUp").
+        // These read from InputManager which is written by the render thread - the
+        // values are one frame stale at most, which is acceptable for gameplay logic.
+        dtEngine.set_function("is_action_pressed", [](const std::string& name) -> bool
+        {
+            return dt::InputManager::Get().IsActionPressed(name);
+        });
+
+        dtEngine.set_function("is_action_held", [](const std::string& name) -> bool
+        {
+            return dt::InputManager::Get().IsActionHeld(name);
+        });
+
+        dtEngine.set_function("get_axis", [](const std::string& name) -> f32
+        {
+            return dt::InputManager::Get().GetAxis(name);
+        });
     }
 
     void SimulationWorld::LoadBuiltinInteractionScripts()
@@ -241,12 +288,18 @@ end
         auto& resolveNode = m_tickGraph.AddTask([this]() { StepInteractionResolve(); }, "InteractionResolve");
         resolveNode.After(autonomyNode);
 
-        // [Navigation, Animation State, Object State attach here in future
+        // [Navigation, Object State attach here in future
         //  milestones, each .After(resolveNode) or after whichever earlier
         //  stage they actually depend on.]
 
+        auto& animationsNode = m_tickGraph.AddTask([this]() 
+        { 
+            dt::sim::AnimationSystem::StepAnimations(m_currentFixedDeltaSeconds, m_visuals); 
+        }, "Animations");
+        animationsNode.After(resolveNode);
+
         auto& snapshotNode = m_tickGraph.AddTask([this]() { BuildSnapshot(*m_currentOutSnapshot); }, "Snapshot");
-        snapshotNode.After(resolveNode);
+        snapshotNode.After(animationsNode);
 
         m_tickGraph.Finalize();
     }
@@ -288,7 +341,7 @@ end
         // Satisfaction weighting for scoring (fast C++ path, see
         // AutonomySystem.h rationale for why scoring itself stays
         // Lua-free) - kept as a small name-keyed lookup here, same
-        // documented M3-era caveat still applies (real content pipeline
+        // caveat still applies (real content pipeline
         // would carry this alongside InteractionDef via .asset data).
         for (AutonomyCandidate& candidate : globalCandidates)
         {
@@ -427,15 +480,21 @@ end
                 proxy.rotationY = 0.0f;
             }
             
-            proxy.archetypeId = 1; // 1 = generic Sim for now, or object depending on future logic
-            
-            if (!m_needs.Get(e))
+            if (VisualComponent* visual = m_visuals.Get(e))
             {
-                proxy.archetypeId = 2; // e.g. Object
+                proxy.visualId = visual->visualId;
+                proxy.animationState = static_cast<u32>(visual->currentState);
+                proxy.currentFrame = visual->currentFrame;
             }
             else
             {
-                proxy.animationPhase = std::clamp(m_needs.Get(e)->Get(NeedId::Hunger) / 100.0f, 0.0f, 1.0f);
+                proxy.visualId = 1;
+                if (!m_needs.Get(e))
+                {
+                    proxy.visualId = 2; // e.g. Object fallback
+                }
+                proxy.animationState = 0;
+                proxy.currentFrame = 0.0f;
             }
 
             outSnapshot.proxies.push_back(proxy);
