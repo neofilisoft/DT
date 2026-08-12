@@ -178,14 +178,14 @@ namespace dt
         // contiguously. Callers needing "only live objects" use
         // ForEachValid below.
         template <typename Func>
-        void ForEachValid(Func&& func)
+        void ForEachValid(Func&& func) const
         {
             for (usize i = 0; i < m_slots.size(); ++i)
             {
                 if (m_alive[i])
                 {
                     const Handle<T> h(static_cast<u32>(i), m_generations[i]);
-                    func(h, m_slots[i]);
+                    func(h, const_cast<T&>(m_slots[i]));
                 }
             }
         }

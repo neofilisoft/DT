@@ -100,6 +100,13 @@ namespace dt
             m_sparse.erase(it);
         }
 
+        void Clear()
+        {
+            m_dense.clear();
+            m_denseToEntity.clear();
+            m_sparse.clear();
+        }
+
         bool Has(EntityHandleT entity) const
         {
             return m_sparse.find(entity) != m_sparse.end();
