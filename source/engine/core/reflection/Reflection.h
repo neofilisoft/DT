@@ -274,6 +274,12 @@ namespace dt
         static constexpr FieldType value = FieldType::NestedStruct;
     };
 
+    template <typename T>
+    struct DT_FieldTypeOf<T, std::enable_if_t<std::is_enum_v<T>>>
+    {
+        static constexpr FieldType value = FieldType::Enum;
+    };
+
     // Guards against a field declared as std::vector<T> being run through
     // plain REFLECT_FIELD (which would otherwise fall through to the
     // "unmapped type" static_assert below with a confusing message) -
