@@ -26,7 +26,7 @@
 //
 // Physical device selection: picks the first discrete GPU, falling back to
 //   any GPU that supports the required queue families and extensions.
-//   For M5, no scoring of multiple discrete GPUs is implemented - the
+//   Currently, no scoring of multiple discrete GPUs is implemented - the
 //   team's development machines each have one GPU.
 //
 // Threading: all VulkanContext methods must be called from the render thread.

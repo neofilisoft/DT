@@ -9,7 +9,7 @@ namespace dt::renderer
     class VulkanDescriptorPool;
     class GpuTexture;
 
-    // A simple material representation for M7.
+    // A simple material representation.
     // Binds a single GpuTexture to Descriptor Set 1.
     class VulkanMaterial
     {

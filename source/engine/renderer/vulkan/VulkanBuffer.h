@@ -10,7 +10,7 @@
 // RAII wrapper around a VkBuffer and its bound VkDeviceMemory.
 // Designed for simple allocations (uniform buffers, vertex buffers, and
 // staging buffers) in raw Vulkan without VMA to keep dependencies minimal
-// for M5.
+// abstraction.
 //
 // In Vulkan, allocating GPU memory requires querying the buffer's memory
 // requirements, finding a matching memory type index from the physical

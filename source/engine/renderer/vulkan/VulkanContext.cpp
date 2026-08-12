@@ -131,7 +131,7 @@ namespace dt::renderer
         VkApplicationInfo appInfo{};
         appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
         appInfo.pApplicationName   = "Domaintic";
-        appInfo.applicationVersion = VK_MAKE_VERSION(0, 5, 0); // M5
+        appInfo.applicationVersion = VK_MAKE_VERSION(0, 9, 0); // M9
         appInfo.pEngineName        = "DTEngine";
         appInfo.engineVersion      = VK_MAKE_VERSION(0, 5, 0);
         appInfo.apiVersion         = VK_API_VERSION_1_2;
@@ -296,7 +296,7 @@ namespace dt::renderer
         }
 
         VkPhysicalDeviceFeatures features{};
-        // No extra features required for M5 quad rendering.
+        // No extra features required for quad rendering.
 
         std::vector<const char*> validationLayers;
         if (m_validationEnabled)

@@ -8,7 +8,7 @@
 // VulkanRenderPass.h
 //
 // A single VkRenderPass with one color attachment (the swapchain image).
-// No depth attachment for M5 (2D quad rendering has no depth test
+// No depth attachment yet (2D quad rendering has no depth test
 // requirements). The render pass defines:
 //
 //   loadOp  = CLEAR   (clear the swapchain image to a background color

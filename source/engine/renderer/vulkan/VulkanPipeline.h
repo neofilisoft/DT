@@ -9,7 +9,7 @@
 //
 // Encapsulates a VkPipeline, VkPipelineLayout, and VkDescriptorSetLayout.
 //
-// Specifically tailored for M5 quad rendering:
+// Specifically tailored for quad rendering:
 //   - No vertex input attributes (vertices are reconstructed in shader).
 //   - Color blending enabled (standard alpha blending).
 //   - Dynamic viewport and scissor states.

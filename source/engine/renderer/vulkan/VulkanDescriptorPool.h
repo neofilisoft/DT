@@ -20,7 +20,7 @@ namespace dt::renderer
         // Allocates a descriptor set based on a provided layout
         bool AllocateDescriptorSet(VulkanContext& ctx, VkDescriptorSetLayout layout, VkDescriptorSet& outSet);
         
-        // Note: For simplicity in M7, we won't implement freeing individual sets,
+        // Note: For simplicity, we won't implement freeing individual sets,
         // we would normally Reset() the entire pool or just keep it around.
         void Reset(VulkanContext& ctx);
 
