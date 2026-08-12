@@ -13,12 +13,11 @@
 // per agent).
 //
 // Why push constants for per-agent data, not an instance buffer:
-//   M5 has ~12 agents. Push constants are the zero-overhead path: one
+//   Push constants are the zero-overhead path: one
 //   vkCmdPushConstants + one vkCmdDraw per agent. An instance buffer
 //   (vkCmdDrawInstanced, single draw call) is the correct optimization for
-//   large agent counts, but M5's job is to prove the pipeline works - the
-//   batching optimization belongs in a dedicated rendering milestone after
-//   profiling establishes the actual bottleneck.
+//   large agent counts, but the current job is to prove the pipeline works - the
+//   buffer is the next logical step when instancing is actually needed.
 // ---------------------------------------------------------------------------
 
 layout(push_constant) uniform AgentPushConstants
@@ -26,6 +25,8 @@ layout(push_constant) uniform AgentPushConstants
     vec2  worldPos;    // agent center in world-space XZ plane
     vec2  halfExtent;  // half-width/half-height of the quad in world units
     vec4  color;       // linear RGBA
+    vec2  uvOffset;
+    vec2  uvScale;
 } pc;
 
 layout(binding = 0) uniform FrameUBO
@@ -36,6 +37,7 @@ layout(binding = 0) uniform FrameUBO
 } ubo;
 
 layout(location = 0) out vec4 fragColor;
+layout(location = 1) out vec2 fragUV;
 
 // Six vertices forming two triangles (CCW winding) covering [-1,1]x[-1,1]
 // in local quad space. No index buffer needed.
@@ -46,6 +48,15 @@ const vec2 kLocalPositions[6] = vec2[](
     vec2( 1.0, -1.0),
     vec2( 1.0,  1.0),
     vec2(-1.0,  1.0)
+);
+
+const vec2 kLocalUVs[6] = vec2[](
+    vec2(0.0, 0.0),
+    vec2(1.0, 0.0),
+    vec2(0.0, 1.0),
+    vec2(1.0, 0.0),
+    vec2(1.0, 1.0),
+    vec2(0.0, 1.0)
 );
 
 void main()
@@ -65,4 +76,7 @@ void main()
 
     gl_Position = vec4(ndc, 0.0, 1.0);
     fragColor   = pc.color;
+    
+    vec2 baseUV = kLocalUVs[gl_VertexIndex];
+    fragUV = pc.uvOffset + baseUV * pc.uvScale;
 }
