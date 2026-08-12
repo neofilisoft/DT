@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 // Game.cpp
 //
-// M3: thin wrapper delegating entirely to SimulationWorld. See Game.h for
+// Thin wrapper delegating entirely to SimulationWorld. See Game.h for
 // why the M1 ToySim implementation was removed rather than kept alongside.
 // ---------------------------------------------------------------------------
 

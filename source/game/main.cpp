@@ -19,7 +19,7 @@
 
 namespace
 {
-    constexpr dt::f32 kInitialTimeScale = 1.0f; // Default to 1x real-time for M5 visual checking
+    constexpr dt::f32 kInitialTimeScale = 1.0f; // Default to 1x real-time for visual checking
     constexpr dt::usize kInitialEntityCount = 12;
 }
 
@@ -56,7 +56,7 @@ int main()
     renderer.SetApplication(&app);
     app.Sim().SetTimeScale(kInitialTimeScale);
 
-    DT_LOG_INFO(LogCategory::Core, "Domaintic M5: {} entities, Vulkan Renderer active, time-scale x{:.0f}.",
+    DT_LOG_INFO(LogCategory::Core, "Domaintic: {} entities, Vulkan Renderer active, time-scale x{:.0f}.",
         domainticGame.LiveEntityCount(), kInitialTimeScale);
 
     app.Run();
