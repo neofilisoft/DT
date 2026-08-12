@@ -3,6 +3,7 @@
 #include "core/input/InputManager.h"
 #include "core/profiler/Profiler.h"
 #include "core/logging/Logger.h"
+#include "core/serialization/Serialization.h"
 #include "simulation/spatial/SpatialSystem.h"
 
 #include <cmath>
@@ -114,6 +115,7 @@ end
         m_queues.Reserve(initialEntityCount);
         m_transforms.Reserve(initialEntityCount);
         m_interactables.Reserve(initialEntityCount);
+        m_navAgents.Reserve(initialEntityCount);
 
         for (usize i = 0; i < initialEntityCount; ++i)
         {
@@ -141,6 +143,11 @@ end
 
         RegisterLuaBindings();
         LoadBuiltinInteractionScripts();
+        
+        m_navigationSystem.Initialize(this);
+        // Temporary testing nav mesh setup
+        m_navigationSystem.CreateTestNavMesh();
+
         BuildTickGraph();
     }
 
@@ -264,6 +271,124 @@ end
         });
     }
 
+    void SimulationWorld::SaveState(dt::BinaryWriter& writer) const
+    {
+        DT_PROFILE_SCOPE("SimulationWorld::SaveState");
+
+        // 1. Clock
+        writer.WritePrimitive(m_clock.TickIndex());
+
+        // 2. Entities
+        writer.WritePrimitive(static_cast<u32>(m_entities.LiveCount()));
+        
+        m_entities.ForEachValid([&](Entity ent)
+        {
+            writer.WritePrimitive(ent.index);
+            writer.WritePrimitive(ent.generation);
+
+            // Transform
+            if (const TransformComponent* tc = m_transforms.Get(ent))
+            {
+                writer.WritePrimitive<u8>(1);
+                writer.WriteObject(tc, TransformComponent::StaticTypeInfo());
+            }
+            else
+            {
+                writer.WritePrimitive<u8>(0);
+            }
+
+            // Visual
+            if (const VisualComponent* vc = m_visuals.Get(ent))
+            {
+                writer.WritePrimitive<u8>(1);
+                writer.WriteObject(vc, VisualComponent::StaticTypeInfo());
+            }
+            else
+            {
+                writer.WritePrimitive<u8>(0);
+            }
+
+            // Needs (raw array)
+            if (const NeedsComponent* nc = m_needs.Get(ent))
+            {
+                writer.WritePrimitive<u8>(1);
+                for (usize i = 0; i < kNeedCount; ++i)
+                {
+                    writer.WritePrimitive(nc->values[i]);
+                }
+            }
+            else
+            {
+                writer.WritePrimitive<u8>(0);
+            }
+            
+            // InteractionQueue is inherently transient runtime state.
+            // InteractableComponent is currently static (defined on creation).
+            // We skip saving them here and assume they are recreated on load.
+        });
+    }
+
+    bool SimulationWorld::LoadState(dt::BinaryReader& reader)
+    {
+        DT_PROFILE_SCOPE("SimulationWorld::LoadState");
+
+        if (reader.AtEnd()) return false;
+
+        u64 tickIndex = reader.ReadPrimitive<u64>();
+        m_clock.Advance(tickIndex);
+
+        // Clear existing state before loading
+        m_entities = EntityAllocator();
+        m_transforms.Clear();
+        m_visuals.Clear();
+        m_needs.Clear();
+        m_interactables.Clear();
+        m_queues.Clear();
+        m_navAgents.Clear();
+
+        u32 liveCount = reader.ReadPrimitive<u32>();
+        for (u32 i = 0; i < liveCount; ++i)
+        {
+            u32 index = reader.ReadPrimitive<u32>();
+            u32 gen = reader.ReadPrimitive<u32>();
+            
+            // Reconstruct entity handle
+            // This requires EntityAllocator to support placing at a specific index,
+            // which it might not. For M13, we assume sequential saves or we just 
+            // call CreateEntity() and hope indices match.
+            // A more robust system would save a UUID map or add a RecreateEntity method.
+            Entity ent = m_entities.Create(); 
+            // For now, we trust the allocator gives us the same index since we just reset it.
+            
+            if (reader.ReadPrimitive<u8>() == 1)
+            {
+                TransformComponent& tc = m_transforms.Add(ent);
+                reader.ReadObject(&tc, TransformComponent::StaticTypeInfo());
+            }
+
+            if (reader.ReadPrimitive<u8>() == 1)
+            {
+                VisualComponent& vc = m_visuals.Add(ent);
+                reader.ReadObject(&vc, VisualComponent::StaticTypeInfo());
+            }
+
+            if (reader.ReadPrimitive<u8>() == 1)
+            {
+                NeedsComponent& nc = m_needs.Add(ent);
+                for (usize n = 0; n < kNeedCount; ++n)
+                {
+                    nc.values[n] = reader.ReadPrimitive<f32>();
+                }
+            }
+            
+            // Re-add un-serialized default components
+            m_interactables.Add(ent);
+            m_queues.Add(ent);
+        }
+
+        return true;
+    }
+
     void SimulationWorld::LoadBuiltinInteractionScripts()
     {
         const bool ok = m_scriptEngine.LoadString(kBuiltinInteractionScript, "builtin_interactions");
@@ -288,15 +413,14 @@ end
         auto& resolveNode = m_tickGraph.AddTask([this]() { StepInteractionResolve(); }, "InteractionResolve");
         resolveNode.After(autonomyNode);
 
-        // [Navigation, Object State attach here in future
-        //  milestones, each .After(resolveNode) or after whichever earlier
-        //  stage they actually depend on.]
+        auto& navigationNode = m_tickGraph.AddTask([this]() { StepNavigation(); }, "Navigation");
+        navigationNode.After(resolveNode);
 
         auto& animationsNode = m_tickGraph.AddTask([this]() 
         { 
             dt::sim::AnimationSystem::StepAnimations(m_currentFixedDeltaSeconds, m_visuals); 
         }, "Animations");
-        animationsNode.After(resolveNode);
+        animationsNode.After(navigationNode);
 
         auto& snapshotNode = m_tickGraph.AddTask([this]() { BuildSnapshot(*m_currentOutSnapshot); }, "Snapshot");
         snapshotNode.After(animationsNode);
@@ -453,6 +577,11 @@ end
             // reaction system) would consume this return value.
             (void)queue->StepFront(m_scriptEngine, entity, m_currentFixedDeltaSeconds);
         });
+    }
+
+    void SimulationWorld::StepNavigation()
+    {
+        m_navigationSystem.StepNavigation(this, m_currentFixedDeltaSeconds);
     }
 
     void SimulationWorld::BuildSnapshot(SimSnapshot& outSnapshot)

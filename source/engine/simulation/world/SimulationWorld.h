@@ -13,9 +13,12 @@
 #include "simulation/interaction/InteractionQueue.h"
 #include "simulation/needs/NeedsComponent.h"
 #include "simulation/spatial/InteractableComponent.h"
+#include "simulation/spatial/InteractableComponent.h"
 #include "simulation/spatial/TransformComponent.h"
 #include "simulation/time/SimClock.h"
-
+#include "simulation/navigation/NavigationSystem.h"
+#include "simulation/navigation/NavAgentComponent.h"
+#include "core/serialization/Serialization.h"
 #include <array>
 #include <functional>
 #include <string>
@@ -98,6 +101,10 @@ namespace dt::sim
         void Tick(u64 tickIndex, f64 fixedDeltaSeconds, SimSnapshot& outSnapshot);
         SimTickFunc MakeTickFunc();
 
+        // M13: Serialization
+        void SaveState(dt::BinaryWriter& writer) const;
+        bool LoadState(dt::BinaryReader& reader);
+
         usize LiveEntityCount() const { return m_entities.LiveCount(); }
         const SimClock& Clock() const { return m_clock; }
 
@@ -115,6 +122,9 @@ namespace dt::sim
         ComponentArray<Entity, NeedsComponent>& Needs() { return m_needs; }
         ComponentArray<Entity, InteractionQueue>& Queues() { return m_queues; }
         ComponentArray<Entity, VisualComponent>& Visuals() { return m_visuals; }
+        ComponentArray<Entity, NavAgentComponent>& NavAgents() { return m_navAgents; }
+
+        NavigationSystem& GetNavigationSystem() { return m_navigationSystem; }
 
         script::ScriptEngine& Scripting() { return m_scriptEngine; }
 
@@ -141,6 +151,7 @@ namespace dt::sim
         void StepNeeds();
         void StepAutonomy();
         void StepInteractionResolve();
+        void StepNavigation();
         void BuildSnapshot(SimSnapshot& outSnapshot);
 
         EntityAllocator m_entities;
@@ -152,6 +163,9 @@ namespace dt::sim
         ComponentArray<Entity, TransformComponent> m_transforms;
         ComponentArray<Entity, InteractableComponent> m_interactables;
         ComponentArray<Entity, VisualComponent> m_visuals;
+        ComponentArray<Entity, NavAgentComponent> m_navAgents;
+
+        NavigationSystem m_navigationSystem;
 
         std::array<NeedDefinition, kNeedCount> m_needDefinitions;
         GlobalInteractionPool m_globalInteractions;
