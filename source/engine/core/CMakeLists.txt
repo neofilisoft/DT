@@ -16,9 +16,14 @@ target_include_directories(dt_core PUBLIC
 
 target_compile_features(dt_core PUBLIC cxx_std_20)
 
+# InputManager (core/input/) uses SDL3 headers for SDL_Keycode,
+# SDL_GamepadButton, SDL_FingerID etc. Core is the right home for
+# input (not renderer) because Simulation must also be able to query
+# action state via Lua without depending on the renderer module.
 target_link_libraries(dt_core PUBLIC
     dt_lua
     dt_sol2
+    dt_sdl3
 )
 
 if(DT_PLATFORM_LINUX)
