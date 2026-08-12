@@ -144,7 +144,7 @@ namespace dt::renderer
             MeshPushConstants pc{};
             pc.modelMatrix = Mat4::Translation(Vec3(proxy.positionX, proxy.positionY, proxy.positionZ));
 
-            const u32 colorIndex = proxy.archetypeId % 6;
+            const u32 colorIndex = proxy.visualId % 6;
             if (colorIndex == 0)
             {
                 pc.color = Vec4(0.2f, 0.8f, 0.4f, 1.0f);

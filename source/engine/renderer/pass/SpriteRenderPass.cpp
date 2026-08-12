@@ -12,6 +12,8 @@ namespace dt::renderer
         float worldPos[2];   // 8 bytes
         float halfExtent[2]; // 8 bytes
         float color[4];      // 16 bytes
+        float uvOffset[2];   // 8 bytes
+        float uvScale[2];    // 8 bytes
     };
 
     SpriteRenderPass::SpriteRenderPass()
@@ -103,22 +105,36 @@ namespace dt::renderer
             SpritePushConstants pc{};
             pc.worldPos[0] = proxy.positionX;
             pc.worldPos[1] = proxy.positionZ; // Map 3D XZ to 2D XY
-            pc.halfExtent[0] = 0.5f;
-            pc.halfExtent[1] = 0.5f;
+            pc.halfExtent[0] = 0.5f * proxy.scaleX;
+            pc.halfExtent[1] = 0.5f * proxy.scaleY;
 
-            const u32 colorIndex = proxy.archetypeId % 6;
+            // Optional tint based on visualId (for debugging)
+            const u32 colorIndex = proxy.visualId % 6;
             if (colorIndex == 0)
             {
-                pc.color[0] = 0.2f; pc.color[1] = 0.8f; pc.color[2] = 0.4f; pc.color[3] = 1.0f;
+                pc.color[0] = 1.0f; pc.color[1] = 1.0f; pc.color[2] = 1.0f; pc.color[3] = 1.0f;
             }
             else if (colorIndex == 1)
             {
-                pc.color[0] = 0.8f; pc.color[1] = 0.4f; pc.color[2] = 0.2f; pc.color[3] = 1.0f;
+                pc.color[0] = 1.0f; pc.color[1] = 1.0f; pc.color[2] = 1.0f; pc.color[3] = 1.0f;
             }
             else
             {
                 pc.color[0] = 0.5f; pc.color[1] = 0.5f; pc.color[2] = 0.5f; pc.color[3] = 1.0f;
             }
+
+            const float kGridSize = 8.0f; // Assuming 8x8 spritesheet grid
+            pc.uvScale[0] = 1.0f / kGridSize;
+            pc.uvScale[1] = 1.0f / kGridSize;
+
+            u32 row = 0;
+            if (proxy.animationState == 1) row = 1;      // Walk
+            else if (proxy.animationState == 2) row = 2; // Interact
+            
+            u32 col = static_cast<u32>(proxy.currentFrame);
+            
+            pc.uvOffset[0] = static_cast<float>(col) / kGridSize;
+            pc.uvOffset[1] = static_cast<float>(row) / kGridSize;
 
             vkCmdPushConstants(cmd, m_pipeline.Layout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SpritePushConstants), &pc);
             vkCmdDraw(cmd, 6, 1, 0, 0);
