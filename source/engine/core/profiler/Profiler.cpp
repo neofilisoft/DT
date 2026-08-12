@@ -34,19 +34,31 @@ namespace dt
         return instance;
     }
 
+    void Profiler::UnregisterThreadBuffer(ProfilerThreadBuffer* buffer)
+    {
+        std::lock_guard<std::mutex> lock(m_registryMutex);
+        for (auto it = m_threadBuffers.begin(); it != m_threadBuffers.end(); ++it)
+        {
+            if (*it == buffer)
+            {
+                m_threadBuffers.erase(it);
+                break;
+            }
+        }
+    }
+
     ProfilerThreadBuffer& Profiler::GetThreadBuffer()
     {
-        thread_local ProfilerThreadBuffer buffer;
-        thread_local bool registered = false;
+        thread_local ProfilerThreadBuffer* buffer = nullptr;
 
-        if (!registered)
+        if (!buffer)
         {
+            buffer = new ProfilerThreadBuffer();
             std::lock_guard<std::mutex> lock(m_registryMutex);
-            m_threadBuffers.push_back(&buffer);
-            registered = true;
+            m_threadBuffers.push_back(buffer);
         }
 
-        return buffer;
+        return *buffer;
     }
 
     std::vector<ProfileEvent> Profiler::SnapshotAllThreads()

@@ -62,6 +62,8 @@ namespace dt
         // display refresh. Drains every registered thread buffer.
         std::vector<ProfileEvent> SnapshotAllThreads();
 
+        void UnregisterThreadBuffer(ProfilerThreadBuffer* buffer);
+
         void SetEnabled(bool enabled) { m_enabled.store(enabled, std::memory_order_relaxed); }
         bool IsEnabled() const { return m_enabled.load(std::memory_order_relaxed); }
 
