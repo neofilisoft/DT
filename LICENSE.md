@@ -7,7 +7,10 @@ By installing, copying, or otherwise using the SOFTWARE PRODUCT, you agree to be
 ## 1. GRANT OF LICENSE
 The SOFTWARE PRODUCT is licensed, not sold. Neofilisoft grants you the following non-exclusive, non-transferable rights:
 * **Internal Use:** You may install and use copies of the SOFTWARE PRODUCT on your computers exclusively for your own internal, proprietary, and in-house development purposes.
-* **No Redistribution:** You may NOT distribute, sub-license, rent, lease, or lend the SOFTWARE PRODUCT or any portion thereof to any third party.
+* **No Public Distribution:** You may NOT publicly publish, distribute, sub-license, rent, lease, or sell the engine source code, binaries, or any portion of the SOFTWARE PRODUCT to any unauthorized third party.
+* **Authorized Sharing:** You may only share the engine source code and related tools with third-party studios, contractors, or partners who are legally bound by a Non-Disclosure Agreement (NDA) and have accepted the terms of this EULA.
+* **Distribution of Compiled Games:** You may distribute games and applications created using the SOFTWARE PRODUCT to the general public, provided that they are distributed solely in compiled, executable (object code) form. You must not include any portion of the engine source code or editor tools in the distributed game.
+* **Educational Access Exception:** Notwithstanding the public distribution restriction, you are permitted to publicly share selected snippets or partial portions of the engine source code solely for educational, tutorial, or demonstrative purposes, provided it does not allow others to reconstruct or bypass the proprietary nature of the full engine.
 
 ## 2. DESCRIPTION OF OTHER RIGHTS AND LIMITATIONS
 * **Limitations on Reverse Engineering, Decompilation, and Disassembly:** You may not reverse engineer, decompile, or disassemble the SOFTWARE PRODUCT, except and only to the extent that such activity is expressly permitted by applicable law notwithstanding this limitation.
