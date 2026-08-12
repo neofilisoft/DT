@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/platform/Types.h"
+#include "core/reflection/Reflection.h"
 #include <string>
 
 namespace dt::sim
@@ -40,6 +41,16 @@ namespace dt::sim
         
         // Visual config (would normally come from an Asset)
         u32 totalFrames = 1;
-        u32 framesPerRow = 1; 
+        u32 framesPerRow = 1;
+
+        REFLECT_BEGIN(VisualComponent)
+            REFLECT_FIELD(visualId)
+            REFLECT_FIELD(currentState)
+            REFLECT_FIELD(currentFrame)
+            REFLECT_FIELD(playbackSpeed)
+            REFLECT_FIELD(isLooping)
+            REFLECT_FIELD(totalFrames)
+            REFLECT_FIELD(framesPerRow)
+        REFLECT_END()
     };
 }
