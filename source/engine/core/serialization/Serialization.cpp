@@ -124,8 +124,15 @@ namespace dt
                 break;
             }
             case FieldType::Enum:
-                DT_ASSERT(false, "Enum field serialization requires explicit per-enum support (not yet wired for this field)");
+            {
+                // Write generic enum based on its actual size (1, 2, 4, 8 bytes)
+                if (field.elementSize == 1)      WritePrimitive<u8>(*reinterpret_cast<const u8*>(fieldPtr));
+                else if (field.elementSize == 2) WritePrimitive<u16>(*reinterpret_cast<const u16*>(fieldPtr));
+                else if (field.elementSize == 4) WritePrimitive<u32>(*reinterpret_cast<const u32*>(fieldPtr));
+                else if (field.elementSize == 8) WritePrimitive<u64>(*reinterpret_cast<const u64*>(fieldPtr));
+                else DT_ASSERT(false, "Unsupported enum size");
                 break;
+            }
         }
     }
 
@@ -262,8 +269,14 @@ namespace dt
                 break;
             }
             case FieldType::Enum:
-                DT_ASSERT(false, "Enum field deserialization requires explicit per-enum support (not yet wired for this field)");
+            {
+                if (field.elementSize == 1)      *reinterpret_cast<u8*>(fieldPtr) = ReadPrimitive<u8>();
+                else if (field.elementSize == 2) *reinterpret_cast<u16*>(fieldPtr) = ReadPrimitive<u16>();
+                else if (field.elementSize == 4) *reinterpret_cast<u32*>(fieldPtr) = ReadPrimitive<u32>();
+                else if (field.elementSize == 8) *reinterpret_cast<u64*>(fieldPtr) = ReadPrimitive<u64>();
+                else DT_ASSERT(false, "Unsupported enum size");
                 break;
+            }
         }
     }
 
@@ -393,8 +406,13 @@ namespace dt
                 break;
             }
             case FieldType::Enum:
-                out << "null";
+            {
+                if (field.elementSize == 1)      out << static_cast<unsigned int>(*reinterpret_cast<const u8*>(fieldPtr));
+                else if (field.elementSize == 2) out << *reinterpret_cast<const u16*>(fieldPtr);
+                else if (field.elementSize == 4) out << *reinterpret_cast<const u32*>(fieldPtr);
+                else if (field.elementSize == 8) out << *reinterpret_cast<const u64*>(fieldPtr);
                 break;
+            }
         }
     }
 
