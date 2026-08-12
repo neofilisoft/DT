@@ -40,6 +40,9 @@ The standalone engine editor. It provides a Scene Outliner, Property Inspector, 
 The command-line asset cooking tool. It converts raw assets (like `.glb`, `.png`) into optimized, Zlib-compressed `.asset` files for the engine to load quickly.
 **Run:** `build/DTCooker.exe <input_file>`
 
+# Domaintic™
+Domaintic (Domain + Domestic) is a Life simulation game.
+
 ## License
 This software is proprietary. See [LICENSE.md](LICENSE.md) for the End-User License Agreement.
 
