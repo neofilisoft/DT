@@ -15,6 +15,6 @@ target_include_directories(dt_simulation PUBLIC ${DT_ENGINE_ROOT})
 # InteractionDef's check/run functions (see scripting/ScriptEngine.h,
 # scripting/ScriptCoroutine.h). No dependency on dt_renderer - Simulation
 # must never see a renderer header, per the sim/render separation rule.
-target_link_libraries(dt_simulation PUBLIC dt_core dt_runtime dt_scripting)
+target_link_libraries(dt_simulation PUBLIC dt_core dt_runtime dt_scripting dt_recast)
 
 set_target_properties(dt_simulation PROPERTIES FOLDER "engine")
