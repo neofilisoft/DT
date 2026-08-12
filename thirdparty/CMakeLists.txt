@@ -205,3 +205,71 @@ else()
     add_library(dt_miniaudio INTERFACE)
 endif()
 
+# ---------------------------------------------------------------------------
+# RecastNavigation
+# ---------------------------------------------------------------------------
+if(EXISTS ${DT_THIRDPARTY_DIR}/recastnavigation/CMakeLists.txt)
+    set(RECASTNAVIGATION_DEMO OFF CACHE BOOL "" FORCE)
+    set(RECASTNAVIGATION_TESTS OFF CACHE BOOL "" FORCE)
+    set(RECASTNAVIGATION_EXAMPLES OFF CACHE BOOL "" FORCE)
+    add_subdirectory(recastnavigation EXCLUDE_FROM_ALL)
+
+    add_library(dt_recast INTERFACE)
+    # The actual targets created by recast are Recast, Detour, etc.
+    target_link_libraries(dt_recast INTERFACE Recast Detour)
+    target_include_directories(dt_recast INTERFACE 
+        ${DT_THIRDPARTY_DIR}/recastnavigation/Recast/Include
+        ${DT_THIRDPARTY_DIR}/recastnavigation/Detour/Include
+    )
+    # Suppress warnings from recastnavigation
+    if(MSVC)
+        target_compile_options(Recast PRIVATE /w)
+        target_compile_options(Detour PRIVATE /w)
+    endif()
+else()
+    message(WARNING
+        "thirdparty/recastnavigation submodule not present."
+    )
+    add_library(dt_recast INTERFACE)
+endif()
+
+# ---------------------------------------------------------------------------
+# zlib
+# Provides: compress() / uncompress() used by DTCooker (asset cooking) and
+# the engine loader (GpuTexture, GpuMesh) to deflate/inflate .asset payloads.
+# We compile only the minimal source set needed for compress/uncompress - no
+# gzip file I/O, no example programs.
+# ---------------------------------------------------------------------------
+if(EXISTS ${DT_THIRDPARTY_DIR}/zlib/zlib.h)
+    set(ZLIB_DIR ${DT_THIRDPARTY_DIR}/zlib)
+
+    add_library(dt_zlib STATIC
+        ${ZLIB_DIR}/adler32.c
+        ${ZLIB_DIR}/compress.c
+        ${ZLIB_DIR}/crc32.c
+        ${ZLIB_DIR}/deflate.c
+        ${ZLIB_DIR}/infback.c
+        ${ZLIB_DIR}/inffast.c
+        ${ZLIB_DIR}/inflate.c
+        ${ZLIB_DIR}/inftrees.c
+        ${ZLIB_DIR}/trees.c
+        ${ZLIB_DIR}/uncompr.c
+        ${ZLIB_DIR}/zutil.c
+    )
+
+    target_include_directories(dt_zlib PUBLIC ${ZLIB_DIR})
+    set_target_properties(dt_zlib PROPERTIES FOLDER "thirdparty/zlib")
+
+    # Suppress warnings from vendored zlib source (not our code to fix).
+    if(MSVC)
+        target_compile_options(dt_zlib PRIVATE /w)
+    else()
+        target_compile_options(dt_zlib PRIVATE -w)
+    endif()
+else()
+    message(WARNING
+        "thirdparty/zlib not present. "
+        "Copy zlib source -> thirdparty/zlib"
+    )
+    add_library(dt_zlib INTERFACE)
+endif()
