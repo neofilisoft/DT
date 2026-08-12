@@ -3,6 +3,8 @@
 #include <vector>
 #include <string>
 #include <filesystem>
+#include <zlib.h>
+#include <cstring>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
@@ -18,8 +20,10 @@ namespace fs = std::filesystem;
 
 struct AssetHeader {
     char magic[4]; // "DTAS"
-    uint32_t version; // 1
-    uint32_t type; // 1 = Texture, 2 = Mesh
+    uint32_t version; // 2 (added compression fields)
+    uint32_t type; // 1 = Texture, 2 = Mesh, 3 = Shader
+    uint32_t isCompressed; // 1 if payload is compressed
+    uint32_t uncompressedSize; // size of original payload
 };
 
 struct TexturePayloadHeader {
@@ -39,6 +43,56 @@ struct MeshPayloadHeader {
     uint32_t indexCount;
 };
 
+// Helper to write an asset file with optional Zlib compression for the payload
+bool WriteAssetFile(const std::string& outputPath, uint32_t type, 
+                    const void* payloadHeader, size_t payloadHeaderSize, 
+                    const void* payloadData, size_t payloadDataSize)
+{
+    std::ofstream out(outputPath, std::ios::binary);
+    if (!out)
+    {
+        std::cerr << "Error: failed to open output file " << outputPath << "\n";
+        return false;
+    }
+
+    // Try to compress payload
+    uLongf compressedSize = compressBound(static_cast<uLong>(payloadDataSize));
+    std::vector<uint8_t> compressedBuffer(compressedSize);
+    
+    int zResult = compress(compressedBuffer.data(), &compressedSize, 
+                           static_cast<const Bytef*>(payloadData), 
+                           static_cast<uLong>(payloadDataSize));
+                           
+    bool useCompression = (zResult == Z_OK && compressedSize < payloadDataSize);
+
+    // Write header
+    AssetHeader header;
+    header.magic[0] = 'D';
+    header.magic[1] = 'T';
+    header.magic[2] = 'A';
+    header.magic[3] = 'S';
+    header.version = 2; // version 2 uses compression
+    header.type = type;
+    header.isCompressed = useCompression ? 1 : 0;
+    header.uncompressedSize = static_cast<uint32_t>(payloadDataSize);
+    out.write(reinterpret_cast<const char*>(&header), sizeof(header));
+
+    // Write payload header
+    out.write(reinterpret_cast<const char*>(payloadHeader), payloadHeaderSize);
+
+    // Write payload data
+    if (useCompression)
+    {
+        out.write(reinterpret_cast<const char*>(compressedBuffer.data()), compressedSize);
+    }
+    else
+    {
+        out.write(reinterpret_cast<const char*>(payloadData), payloadDataSize);
+    }
+
+    return true;
+}
+
 bool CookTexture(const std::string& inputPath, const std::string& outputPath)
 {
     int width = 0;
@@ -53,37 +107,23 @@ bool CookTexture(const std::string& inputPath, const std::string& outputPath)
         return false;
     }
 
-    std::ofstream out(outputPath, std::ios::binary);
-    if (!out)
-    {
-        std::cerr << "Error: failed to open output file " << outputPath << "\n";
-        stbi_image_free(pixels);
-        return false;
-    }
-
-    // Write header
-    AssetHeader header;
-    header.magic[0] = 'D';
-    header.magic[1] = 'T';
-    header.magic[2] = 'A';
-    header.magic[3] = 'S';
-    header.version = 1;
-    header.type = 1; // Texture
-    out.write(reinterpret_cast<const char*>(&header), sizeof(header));
-
     // Write payload header
     TexturePayloadHeader texHeader;
     texHeader.width = static_cast<uint32_t>(width);
     texHeader.height = static_cast<uint32_t>(height);
     texHeader.channels = 4; // We forced 4 channels (RGBA)
-    out.write(reinterpret_cast<const char*>(&texHeader), sizeof(texHeader));
 
-    // Write raw pixels
-    out.write(reinterpret_cast<const char*>(pixels), width * height * 4);
+    bool success = WriteAssetFile(outputPath, 1, 
+                                  &texHeader, sizeof(texHeader), 
+                                  pixels, width * height * 4);
 
     stbi_image_free(pixels);
-    std::cout << "Successfully cooked texture: " << inputPath << " -> " << outputPath << " (" << width << "x" << height << ")\n";
-    return true;
+    
+    if (success)
+    {
+        std::cout << "Successfully cooked texture: " << inputPath << " -> " << outputPath << " (" << width << "x" << height << ")\n";
+    }
+    return success;
 }
 
 bool CookMesh(const std::string& inputPath, const std::string& outputPath)
@@ -216,37 +256,31 @@ bool CookMesh(const std::string& inputPath, const std::string& outputPath)
         }
     }
 
-    std::ofstream out(outputPath, std::ios::binary);
-    if (!out)
-    {
-        std::cerr << "Error: failed to open output file " << outputPath << "\n";
-        return false;
-    }
-
-    // Write header
-    AssetHeader header;
-    header.magic[0] = 'D';
-    header.magic[1] = 'T';
-    header.magic[2] = 'A';
-    header.magic[3] = 'S';
-    header.version = 1;
-    header.type = 2; // Mesh
-    out.write(reinterpret_cast<const char*>(&header), sizeof(header));
-
-    // Write payload header
     MeshPayloadHeader meshHeader;
     meshHeader.vertexCount = static_cast<uint32_t>(vertices.size());
     meshHeader.indexCount = static_cast<uint32_t>(indices.size());
-    out.write(reinterpret_cast<const char*>(&meshHeader), sizeof(meshHeader));
 
-    // Write vertex array
-    out.write(reinterpret_cast<const char*>(vertices.data()), vertices.size() * sizeof(Vertex));
+    // Combine vertices and indices into a single payload buffer
+    std::vector<uint8_t> payload;
+    size_t vertexBytes = vertices.size() * sizeof(Vertex);
+    size_t indexBytes = indices.size() * sizeof(uint32_t);
+    payload.resize(vertexBytes + indexBytes);
+    
+    std::memcpy(payload.data(), vertices.data(), vertexBytes);
+    if (indexBytes > 0)
+    {
+        std::memcpy(payload.data() + vertexBytes, indices.data(), indexBytes);
+    }
 
-    // Write index array
-    out.write(reinterpret_cast<const char*>(indices.data()), indices.size() * sizeof(uint32_t));
+    bool success = WriteAssetFile(outputPath, 2, 
+                                  &meshHeader, sizeof(meshHeader), 
+                                  payload.data(), payload.size());
 
-    std::cout << "Successfully cooked mesh: " << inputPath << " -> " << outputPath << " (" << vertices.size() << " vertices, " << indices.size() << " indices)\n";
-    return true;
+    if (success)
+    {
+        std::cout << "Successfully cooked mesh: " << inputPath << " -> " << outputPath << " (" << vertices.size() << " vertices, " << indices.size() << " indices)\n";
+    }
+    return success;
 }
 
 struct ShaderPayloadHeader {
@@ -299,35 +333,19 @@ bool CookShader(const std::string& inputPath, const std::string& outputPath)
     spvFile.close();
     fs::remove(tempSpv);
 
-    // Write .asset file
-    std::ofstream out(outputPath, std::ios::binary);
-    if (!out)
-    {
-        std::cerr << "Error: failed to open output file " << outputPath << "\n";
-        return false;
-    }
-
-    // Write header
-    AssetHeader header;
-    header.magic[0] = 'D';
-    header.magic[1] = 'T';
-    header.magic[2] = 'A';
-    header.magic[3] = 'S';
-    header.version = 1;
-    header.type = 3; // Shader
-    out.write(reinterpret_cast<const char*>(&header), sizeof(header));
-
-    // Write payload header
     ShaderPayloadHeader shaderHeader;
     shaderHeader.byteSize = static_cast<uint32_t>(size);
     shaderHeader.stage = stage;
-    out.write(reinterpret_cast<const char*>(&shaderHeader), sizeof(shaderHeader));
 
-    // Write raw SPIR-V bytes
-    out.write(buffer.data(), buffer.size());
+    bool success = WriteAssetFile(outputPath, 3, 
+                                  &shaderHeader, sizeof(shaderHeader), 
+                                  buffer.data(), buffer.size());
 
-    std::cout << "Successfully cooked shader: " << inputPath << " -> " << outputPath << " (" << buffer.size() << " bytes)\n";
-    return true;
+    if (success)
+    {
+        std::cout << "Successfully cooked shader: " << inputPath << " -> " << outputPath << " (" << buffer.size() << " bytes)\n";
+    }
+    return success;
 }
 
 int main(int argc, char* argv[])
