@@ -1,4 +1,4 @@
-# ---------------------------------------------------------------------------
+﻿# ---------------------------------------------------------------------------
 # dt_editor
 # The standalone editor library. Links against dt_renderer (ImGui/Vulkan),
 # dt_simulation, and dt_imguizmo (transform gizmos).
