@@ -41,7 +41,7 @@ The command-line asset cooking tool. It converts raw assets (like `.glb`, `.png`
 **Run:** `build/DTCooker.exe <input_file>`
 
 # Domaintic™
-Domaintic (Domain + Domestic) is a Life simulation game.
+Domaintic (Domain + Domestic) is a Life simulation game made by DT.
 
 ## License
 This software is proprietary. See [LICENSE.md](LICENSE.md) for the End-User License Agreement.
