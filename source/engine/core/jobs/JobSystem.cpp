@@ -104,6 +104,7 @@ namespace dt
                 {
                     TaskFunc* taskSlot = new TaskFunc([this, successor]() { ExecuteNode(successor); });
                     m_workers[worker]->deque.Push(taskSlot);
+                    m_wakeCv.notify_all();
                 }
                 else
                 {
@@ -116,6 +117,7 @@ namespace dt
                     {
                         TaskFunc* taskSlot = new TaskFunc([this, successor]() { ExecuteNode(successor); });
                         m_workers[0]->deque.Push(taskSlot);
+                        m_wakeCv.notify_all();
                     }
                 }
             }
@@ -225,6 +227,7 @@ namespace dt
         DT_PROFILE_SCOPE("JobSystem::RunGraph");
 
         graph.Reset();
+        m_activeGraphPendingCount.store(static_cast<u32>(graph.Nodes().size()), std::memory_order_release);
 
         u32 readyCount = 0;
         for (auto& node : graph.Nodes())
@@ -239,8 +242,11 @@ namespace dt
                 ++readyCount;
             }
         }
-
-        m_activeGraphPendingCount.store(static_cast<u32>(graph.Nodes().size()), std::memory_order_release);
+        
+        if (readyCount > 0)
+        {
+            m_wakeCv.notify_all();
+        }
 
         // The calling thread is not one of the pool's Worker objects (it
         // has no deque of its own), so it participates purely as a thief,
