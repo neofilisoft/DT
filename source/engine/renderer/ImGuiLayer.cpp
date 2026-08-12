@@ -161,7 +161,7 @@ namespace dt::renderer
 
         ImGui::Begin("Simulation HUD Overlay", nullptr, overlayFlags);
         {
-            ImGui::TextColored(ImVec4(1.0f, 0.76f, 0.03f, 1.0f), "DTEngine M5 Runtime Monitor");
+            ImGui::TextColored(ImVec4(1.0f, 0.76f, 0.03f, 1.0f), "DTEngine Runtime Monitor");
             ImGui::Separator();
 
             ImGui::Text("Tick Index:  %llu", snapshot.tickIndex);
@@ -232,18 +232,19 @@ namespace dt::renderer
                 const auto& proxy = snapshot.proxies[selectedAgent];
                 ImGui::Text("Entity Handle ID: 0x%016llX", proxy.entityId);
                 ImGui::Text("Position XZ:      (%.3f, %.3f)", proxy.positionX, proxy.positionZ);
-                ImGui::Text("Archetype ID:     %u", proxy.archetypeId);
+                ImGui::Text("Visual ID:        %u", proxy.visualId);
                 ImGui::Text("Animation State:  %u", proxy.animationState);
-
+                ImGui::Text("Current Frame:    %.2f", proxy.currentFrame);
+                
                 ImGui::Separator();
 
                 // Note on simulation needs:
                 // Since M1, the Simulation writes flat proxies into SimSnapshot.
                 // It does NOT expose NeedsComponent directly to the renderer to keep
                 // thread separation. In the final game (Phase 6), needs data can be
-                // added to the snapshot. For M5, we present this architecture note.
-                ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "M5 Architectural Note:");
-                ImGui::TextWrapped("The renderer does not hold handles to live Simulation state. "
+                // added to the snapshot.
+                ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Architectural Note:");
+                ImGui::TextWrapped("The renderer does not read dt_simulation state directly. "
                                    "Needs decay and Autonomy scoring run entirely headless on "
                                    "the Simulation thread. Simulation stats are written out "
                                    "via read-only snapshots to this UI thread.");

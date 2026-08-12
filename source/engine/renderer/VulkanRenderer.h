@@ -2,6 +2,7 @@
 
 #include "renderer/IRenderer.h"
 #include "renderer/ImGuiLayer.h"
+#include "renderer/ui/GameUILayer.h"
 #include "renderer/sdl/SDLWindow.h"
 #include "renderer/sdl/SDLInputMapper.h"
 #include "renderer/vulkan/VulkanContext.h"
@@ -76,6 +77,7 @@ namespace dt
         renderer::VulkanSync         m_sync;
         renderer::VulkanMemoryAllocator m_allocator;
         renderer::ImGuiLayer         m_imguiLayer;
+        renderer::GameUILayer         m_gameUILayer;
 
         VkSurfaceKHR m_surface           = VK_NULL_HANDLE;
         u32          m_currentFrameIndex  = 0;
@@ -85,7 +87,7 @@ namespace dt
 
         SDLInputMapper               m_inputMapper;
 
-        // M7 Global systems
+        // Global systems
         renderer::Camera               m_camera;
         renderer::VulkanDescriptorPool m_descriptorPool;
         renderer::VulkanBuffer         m_globalUBO;

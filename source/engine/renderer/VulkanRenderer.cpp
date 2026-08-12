@@ -1,10 +1,12 @@
 #include "renderer/VulkanRenderer.h"
 
+#include "core/input/InputManager.h"
 #include "core/logging/Logger.h"
 #include "runtime/Application.h"
 
 #include <SDL3/SDL_vulkan.h>
 #include <imgui.h>
+#include <imgui_impl_sdl3.h>
 #include <imgui_impl_vulkan.h>
 
 #include <vector>
@@ -22,7 +24,7 @@ namespace dt
         DT_LOG_INFO(LogCategory::Renderer, "VulkanRenderer: initializing window and Vulkan backend...");
 
         // 1. Initialize SDL Window
-        if (!m_window.Initialize("Domaintic - DTEngine M7", m_width, m_height))
+        if (!m_window.Initialize("Domaintic - DTEngine", m_width, m_height))
         {
             DT_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: window initialization failed");
             return false;
@@ -104,7 +106,7 @@ namespace dt
         if (!m_sync.Initialize(m_context, kMaxFramesInFlight)) return false;
         if (!m_allocator.Initialize(&m_context)) return false;
         
-        // M7 Systems Initialization
+        // Systems Initialization
         m_camera.SetPerspective(math::DegToRad(60.0f), (float)m_width / (float)m_height, 0.1f, 1000.0f);
         m_camera.SetTransform(Vec3(0.0f, 10.0f, 10.0f), math::DegToRad(-45.0f), 0.0f);
 
@@ -159,6 +161,13 @@ namespace dt
         if (!m_imguiLayer.Initialize(m_context, m_swapchain, m_renderPass.Handle(), m_window.Handle()))
             return false;
 
+        // GameUILayer shares the ImGui context - must init AFTER ImGuiLayer.
+        m_gameUILayer.Initialize();
+
+        // Load input bindings from config. Fallback to engine defaults on failure.
+        InputManager::Get().LoadBindings("source/engine/asset/input.ini");
+        InputManager::Get().OpenGamepads();
+
         return true;
     }
 
@@ -173,6 +182,8 @@ namespace dt
             m_testTexture.Shutdown(m_context, m_allocator);
 
             m_imguiLayer.Shutdown(m_context);
+            m_gameUILayer.Shutdown();
+            InputManager::Get().CloseGamepads();
             m_sync.Shutdown(m_context);
             m_commandPool.Shutdown(m_context);
             m_swapchain.Shutdown(m_context);
@@ -213,15 +224,29 @@ namespace dt
             return;
         }
 
-        // Map key inputs to simulation using our InputMapper helper
+        // Process all pending SDL events - keyboard, gamepad, window, touch.
+        // InputManager::BeginFrame clears "just pressed" flags before we feed events.
+        InputManager::Get().BeginFrame();
         SDL_Event ev;
-        while (SDL_PeepEvents(&ev, 1, SDL_GETEVENT, SDL_EVENT_KEY_DOWN, SDL_EVENT_KEY_DOWN) > 0)
+        while (SDL_PollEvent(&ev))
         {
+            // Let ImGui see every event first (for text fields, mouse in debug UI).
+            ImGui_ImplSDL3_ProcessEvent(&ev);
+
+            if (ev.type == SDL_EVENT_QUIT)
+            {
+                if (m_app != nullptr)
+                    m_app->RequestShutdown();
+                return;
+            }
+
             if (m_app != nullptr)
             {
-                m_inputMapper.ProcessEvent(ev, *m_app);
+                if (!m_inputMapper.ProcessEvent(ev, *m_app))
+                    return;
             }
         }
+        InputManager::Get().EndFrame();
 
         if (resized || m_resized)
         {
@@ -282,18 +307,19 @@ namespace dt
         m_spritePass.SetupFrame(m_swapchain.Extent(), m_globalUBOSet, &m_testSpriteMaterial, &snapshot.proxies);
         m_spritePass.Execute(cmd);
 
-        // Draw HUD overlay
+        // Draw HUD overlay - Game HUD first, then engine Debug HUD on top
         if (m_imguiLayer.IsInitialized())
         {
             m_imguiLayer.BeginFrame();
-            
-            // Query achieved simulation TPS from SimulationLoop
+
+            // Game HUD (day/time, needs bars, entity selector)
+            m_gameUILayer.DrawGameHUD(snapshot, m_width, m_height);
+
+            // Engine Debug HUD (simulation inspector, profiler, speed controls)
             float tps = 0.0f;
             if (m_app != nullptr)
-            {
                 tps = m_app->Sim().MeasuredTicksPerSecond();
-            }
-            
+
             m_imguiLayer.DrawHUD(snapshot, tps);
             m_imguiLayer.Render(cmd);
         }
