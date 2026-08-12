@@ -54,7 +54,7 @@ namespace dt
         usize LiveCount() const { return m_slots.LiveCount(); }
 
         template <typename Func>
-        void ForEachValid(Func&& func)
+        void ForEachValid(Func&& func) const
         {
             m_slots.ForEachValid([&](Entity entity, EntityTag&) { func(entity); });
         }
