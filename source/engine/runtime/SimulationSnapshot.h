@@ -4,6 +4,8 @@
 #include "runtime/Entity.h"
 
 #include <atomic>
+#include <bitset>
+#include <array>
 #include <memory>
 #include <string>
 #include <vector>
@@ -66,10 +68,12 @@ namespace dt
         f32 positionX = 0.0f;
         f32 positionY = 0.0f;
         f32 positionZ = 0.0f;
-        f32 rotationY = 0.0f;   // yaw, radians - sufficient for 2.5D top-down agents
-        u32 archetypeId = 0;    // which mesh/sprite/animation-set to use; renderer-side lookup table
+        f32 rotationY = 0.0f;
+        f32 scaleX = 1.0f;
+        f32 scaleY = 1.0f;
+        u32 visualId = 0;
         u32 animationState = 0;
-        f32 animationPhase = 0.0f; // 0..1 normalized, for interpolation between sim ticks
+        f32 currentFrame = 0.0f;
     };
 
     // Everything the render thread needs to draw one frame, plus enough
@@ -77,12 +81,36 @@ namespace dt
     // ticks and to display sim time / time-scale in UI (a life-sim HUD
     // needs "Day 14, 2:30 PM, running at x8" without querying simulation
     // state directly).
+    // Input state snapshot written by the render/platform thread and read by
+    // the simulation thread via Lua bindings. kMaxInputActions must match
+    // InputManager::kMaxActions (64). Flat bitsets + float array so copying
+    // the snapshot across the thread boundary is a cheap contiguous copy,
+    // not a heap allocation.
+    static constexpr usize kMaxInputActions = 64;
+
+    struct InputSnapshot
+    {
+        std::bitset<kMaxInputActions> held;      // Is the action currently held?
+        std::bitset<kMaxInputActions> pressed;   // Did it just go down this frame?
+        std::bitset<kMaxInputActions> released;  // Did it just go up this frame?
+        std::array<f32, kMaxInputActions> axes = {}; // Analog axis values [-1, 1]
+
+        void Clear()
+        {
+            held.reset();
+            pressed.reset();
+            released.reset();
+            axes.fill(0.0f);
+        }
+    };
+
     struct SimSnapshot
     {
         u64 tickIndex = 0;
         f64 simTimeSeconds = 0.0;   // total simulated seconds elapsed, unaffected by time-scale wall-clock cost
         f32 timeScale = 1.0f;
         std::vector<RenderProxy> proxies;
+        InputSnapshot input;        // Input state for this frame, for Lua polling
 
         void Clear()
         {
@@ -90,6 +118,7 @@ namespace dt
             simTimeSeconds = 0.0;
             timeScale = 1.0f;
             proxies.clear();
+            input.Clear();
         }
     };
 
