@@ -68,6 +68,10 @@ add_subdirectory(source/engine/runtime)
 add_subdirectory(source/engine/scripting)
 add_subdirectory(source/engine/simulation)
 
+if(DT_BUILD_EDITOR)
+    add_subdirectory(source/engine/editor)
+endif()
+
 # ---------------------------------------------------------------------------
 # Game
 # ---------------------------------------------------------------------------
@@ -80,6 +84,18 @@ add_subdirectory(source/game)
 add_executable(DTCooker source/tools/cooker/main.cpp)
 target_link_libraries(DTCooker PRIVATE dt_tinygltf dt_stb dt_zlib)
 set_target_properties(DTCooker PROPERTIES FOLDER "tools")
+
+# ---------------------------------------------------------------------------
+# DTEditor standalone executable
+# ---------------------------------------------------------------------------
+if(DT_BUILD_EDITOR)
+    add_executable(DTEditor source/tools/editor_main/main.cpp)
+    target_link_libraries(DTEditor PRIVATE dt_editor dt_simulation dt_renderer dt_core)
+    set_target_properties(DTEditor PROPERTIES FOLDER "tools")
+    if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Release")
+        set_target_properties(DTEditor PROPERTIES WIN32_EXECUTABLE TRUE)
+    endif()
+endif()
 
 if(DT_BUILD_TESTS)
     enable_testing()
