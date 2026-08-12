@@ -7,8 +7,7 @@ Since DT Engine is a proprietary, in-house game engine developed by Neofilisoft,
 | Version | Supported          |
 | ------- | ------------------ |
 | Beta    | :white_check_mark: |
-| Alpha   | :white_check_mark: |
-| Older   | :x:                |
+| Alpha   | :x:                |
 
 ## Reporting a Vulnerability
 
