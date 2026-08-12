@@ -1,4 +1,4 @@
-# Domaintic
+# Domaintic™
 Domaintic (Domain + Domestic) is a Life simulation game 
 
                        
