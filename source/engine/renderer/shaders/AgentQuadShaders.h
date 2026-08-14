@@ -1,3 +1,4 @@
+﻿// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
