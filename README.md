@@ -9,7 +9,7 @@
 ## Key Architectural Highlights
 
 ### 1. Rendering Architecture (Vulkan Backend)
-- **Vulkan 1.3/1.4 Core**: Low-overhead command recording, dynamic rendering, and explicit synchronization.
+- **Vulkan 1.4 Core**: Low-overhead command recording, dynamic rendering, and explicit synchronization.
 - **Dual 2D / 3D Pipeline Support**:
   - **2D/Isometric**: High-throughput sprite batching, multi-layer depth sorting, and atlas UV mapping.
   - **3D Mesh Pipeline**: Modern GLTF/GLB loading via `tinygltf` with `assimp` fallback, handle-based `MeshRegistry`, staging buffer GPU uploads, and SPIR-V static/skinned mesh shaders.
