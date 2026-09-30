@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/handle/Handle.h"
@@ -12,8 +13,9 @@
 // ...) keys its ComponentArray<Entity, T> instances against this same type.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     struct EntityTag {};
     using Entity = Handle<EntityTag>;
 }
+

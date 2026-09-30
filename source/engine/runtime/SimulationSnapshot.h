@@ -1,6 +1,8 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
+#include "core/string/StringID.h"
 #include "runtime/Entity.h"
 
 #include <atomic>
@@ -54,7 +56,7 @@
 // tick depends on.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     // A single drawable's render-relevant state, sampled from simulation
     // for one tick. Deliberately flat POD: no owning pointers, no
@@ -71,9 +73,38 @@ namespace dt
         f32 rotationY = 0.0f;
         f32 scaleX = 1.0f;
         f32 scaleY = 1.0f;
-        u32 visualId = 0;
+        // Sprite2D projection; normalized UVs work for standalone textures and atlases.
+        StringID spriteTexture;
+        f32 spriteU = 0.0f;
+        f32 spriteV = 0.0f;
+        f32 spriteWidth = 1.0f;
+        f32 spriteHeight = 1.0f;
+        f32 spriteTintR = 1.0f;
+        f32 spriteTintG = 1.0f;
+        f32 spriteTintB = 1.0f;
+        f32 spriteTintA = 1.0f;
+        i32 renderLayer = 0;
+        bool isSprite2D = false;
+        u32 teamId = 0;
+        i32 hp = 0;
+        i32 maxHp = 0;
+        bool selected = false;
+        lacrima::StringID visualId;
         u32 animationState = 0;
         f32 currentFrame = 0.0f;
+    };
+
+    // A single vertical wall slice produced by a 2.5D raycaster. This is
+    // deliberately renderer-facing POD so a game can generate columns from
+    // any map implementation without exposing simulation-owned objects.
+    struct RaycastColumn
+    {
+        bool hit = false;
+        f32 distance = 0.0f;
+        f32 wallU = 0.0f;
+        u16 textureIndex = 0;
+        u8 side = 0;
+        f32 shade = 1.0f;
     };
 
     // Everything the render thread needs to draw one frame, plus enough
@@ -110,6 +141,7 @@ namespace dt
         f64 simTimeSeconds = 0.0;   // total simulated seconds elapsed, unaffected by time-scale wall-clock cost
         f32 timeScale = 1.0f;
         std::vector<RenderProxy> proxies;
+        std::vector<RaycastColumn> raycastColumns;
         InputSnapshot input;        // Input state for this frame, for Lua polling
 
         void Clear()
@@ -118,6 +150,7 @@ namespace dt
             simTimeSeconds = 0.0;
             timeScale = 1.0f;
             proxies.clear();
+            raycastColumns.clear();
             input.Clear();
         }
     };
@@ -211,3 +244,4 @@ namespace dt
         // 3-justWritten-previousReady cycle formula used in CommitWrite.
     };
 }
+

@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/logging/Logger.h"
@@ -36,7 +37,7 @@
 // source/game is Domaintic-specific.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     class Application
     {
@@ -45,6 +46,8 @@ namespace dt
             : m_simLoop(m_snapshot, std::move(tickFunc))
             , m_renderLoop(m_snapshot, renderer)
         {
+            // C3 fix: wire render loop failure signalling to the supervisor's shutdown flag.
+            m_renderLoop.SetShutdownSignal(s_shutdownRequested);
         }
 
         // Starts both threads and blocks the calling thread, polling for
@@ -60,7 +63,7 @@ namespace dt
         // inherently tied to the OS window, not to simulation).
         void Run()
         {
-            DT_LOG_INFO(LogCategory::Core, "Application starting: DTEngine / Domaintic (M1 harness)");
+            LACRIMA_LOG_INFO(LogCategory::Core, "Application starting: DTEngine / Domaintic (M1 harness)");
 
             s_shutdownRequested.store(false, std::memory_order_relaxed);
             std::signal(SIGINT, &Application::OnSignal);
@@ -73,10 +76,10 @@ namespace dt
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
             }
 
-            DT_LOG_INFO(LogCategory::Core, "Application shutdown requested, stopping threads...");
+            LACRIMA_LOG_INFO(LogCategory::Core, "Application shutdown requested, stopping threads...");
             m_simLoop.Stop();
             m_renderLoop.Stop();
-            DT_LOG_INFO(LogCategory::Core, "Application stopped cleanly.");
+            LACRIMA_LOG_INFO(LogCategory::Core, "Application stopped cleanly.");
         }
 
         void RequestShutdown() { s_shutdownRequested.store(true, std::memory_order_relaxed); }
@@ -94,3 +97,6 @@ namespace dt
         static inline std::atomic<bool> s_shutdownRequested{ false };
     };
 }
+
+
+

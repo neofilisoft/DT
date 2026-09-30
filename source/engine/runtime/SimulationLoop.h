@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/logging/Logger.h"
@@ -36,12 +37,12 @@
 // TaskGraph determinism notes for how the per-tick module pipeline
 // (Time -> Needs -> Relationship -> AI -> Job Queue -> Navigation ->
 // Animation State -> Object State) is expected to be wired as a TaskGraph
-// inside that callback in later milestones. SimulationLoop itself does not
+// inside that callback in the future. SimulationLoop itself does not
 // care what's inside the callback; it only guarantees fixed dt and tick
 // ordering.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     // Sim-time seconds per tick. 62.5 ticks/sec keeps a round 16ms step;
     // exposed as a named constant (not a magic number at call sites)
@@ -64,7 +65,7 @@ namespace dt
         // the loop runs on its own std::thread until Stop() is called.
         void Start()
         {
-            DT_ASSERT(!m_thread.joinable(), "SimulationLoop::Start called while already running");
+            LACRIMA_ASSERT(!m_thread.joinable(), "SimulationLoop::Start called while already running");
             m_running.store(true, std::memory_order_relaxed);
             m_thread = std::thread(&SimulationLoop::Run, this);
         }
@@ -83,7 +84,7 @@ namespace dt
         // one tick, never mid-tick.
         void SetTimeScale(f32 scale)
         {
-            DT_ASSERT(scale >= 0.0f, "SimulationLoop::SetTimeScale: negative time scale is not valid");
+            LACRIMA_ASSERT(scale >= 0.0f, "SimulationLoop::SetTimeScale: negative time scale is not valid");
             m_timeScale.store(scale, std::memory_order_relaxed);
         }
 
@@ -101,7 +102,7 @@ namespace dt
     private:
         void Run()
         {
-            DT_LOG_INFO(LogCategory::Simulation, "SimulationLoop starting (fixed tick = {:.4f}s / {:.1f} ticks/sec at x1)",
+            LACRIMA_LOG_INFO(LogCategory::Simulation, "SimulationLoop starting (fixed tick = {:.4f}s / {:.1f} ticks/sec at x1)",
                 kFixedTickSeconds, 1.0 / kFixedTickSeconds);
 
             f64 simTimeSeconds = 0.0;
@@ -171,7 +172,7 @@ namespace dt
                 }
             }
 
-            DT_LOG_INFO(LogCategory::Simulation, "SimulationLoop stopped at tick {}", m_tickIndex.load(std::memory_order_relaxed));
+            LACRIMA_LOG_INFO(LogCategory::Simulation, "SimulationLoop stopped at tick {}", m_tickIndex.load(std::memory_order_relaxed));
         }
 
         TripleBufferedSnapshot& m_snapshot;
@@ -183,3 +184,5 @@ namespace dt
         std::atomic<f32> m_measuredTps{ 0.0f };
     };
 }
+
+

@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/logging/Logger.h"
@@ -28,7 +29,7 @@
 // by convention.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     class RenderLoop
     {
@@ -41,7 +42,7 @@ namespace dt
 
         void Start()
         {
-            DT_ASSERT(!m_thread.joinable(), "RenderLoop::Start called while already running");
+            LACRIMA_ASSERT(!m_thread.joinable(), "RenderLoop::Start called while already running");
             m_running.store(true, std::memory_order_relaxed);
             m_thread = std::thread(&RenderLoop::Run, this);
         }
@@ -57,12 +58,22 @@ namespace dt
 
         f32 MeasuredFramesPerSecond() const { return m_measuredFps.load(std::memory_order_relaxed); }
 
+        // C3 fix: link the supervisor's shutdown atomic so renderer init failure propagates cleanly.
+        void SetShutdownSignal(std::atomic<bool>& signal) { m_shutdownSignal = &signal; }
+        bool DidInitializationFail() const { return m_initializationFailed.load(std::memory_order_relaxed); }
+
     private:
         void Run()
         {
             if (!m_renderer.Initialize())
             {
-                DT_LOG_ERROR(LogCategory::Renderer, "RenderLoop: renderer Initialize() failed, aborting render thread");
+                LACRIMA_LOG_ERROR(LogCategory::Renderer, "RenderLoop: renderer Initialize() failed, signalling shutdown");
+                // C3 fix: propagate the failure so the supervisor loop exits instead of spinning indefinitely.
+                m_initializationFailed.store(true, std::memory_order_relaxed);
+                if (m_shutdownSignal)
+                {
+                    m_shutdownSignal->store(true, std::memory_order_relaxed);
+                }
                 return;
             }
 
@@ -79,7 +90,11 @@ namespace dt
             while (m_running.load(std::memory_order_relaxed))
             {
                 m_snapshot.AcquireRead(localSnapshot);
-                m_renderer.Render(localSnapshot);
+                if (!m_renderer.Render(localSnapshot))
+                {
+                    if (m_shutdownSignal) m_shutdownSignal->store(true, std::memory_order_relaxed);
+                    break;
+                }
                 ++frameCount;
 
                 frameAnchor += std::chrono::duration_cast<std::chrono::steady_clock::duration>(targetFrameDuration);
@@ -111,5 +126,12 @@ namespace dt
         std::thread m_thread;
         std::atomic<bool> m_running{ false };
         std::atomic<f32> m_measuredFps{ 0.0f };
+        // C3 fix: set by caller so renderer init failure signals the supervisor loop to exit.
+        std::atomic<bool>* m_shutdownSignal{ nullptr };
+        std::atomic<bool> m_initializationFailed{ false };
     };
 }
+
+
+
+

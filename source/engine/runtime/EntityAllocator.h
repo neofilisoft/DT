@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/handle/Handle.h"
@@ -31,7 +32,7 @@
 // to be a stable cross-module key, not a data container.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     class EntityAllocator
     {
@@ -59,7 +60,20 @@ namespace dt
             m_slots.ForEachValid([&](Entity entity, EntityTag&) { func(entity); });
         }
 
+        template <typename Writer>
+        void Serialize(Writer& writer) const
+        {
+            m_slots.Serialize(writer);
+        }
+
+        template <typename Reader>
+        bool Deserialize(Reader& reader)
+        {
+            return m_slots.Deserialize(reader);
+        }
+
     private:
         SlotMap<EntityTag> m_slots;
     };
 }
+
