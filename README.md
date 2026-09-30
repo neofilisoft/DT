@@ -1,8 +1,10 @@
 # Lacrima Engine (DT Engine)
 
-**Lacrima Engine** (formerly Domaintic / DT Engine) is a high-performance, modular 2D/3D game and simulation engine developed by Neofilisoft. Built with modern C++20 and a Vulkan backend, Lacrima is engineered around a cache-friendly Sparse-Set Entity Component System (ECS), state snapshotting, deterministic simulation, and an integrated editor tooling suite.
+**Lacrima Engine** (formerly Domestic / DT Engine) is a high-performance, modular 2D/3D game and simulation engine developed by Neofilisoft. Built with modern C++20 and a Vulkan backend, Lacrima is engineered around a cache-friendly Sparse-Set Entity Component System (ECS), state snapshotting, deterministic simulation, and an integrated editor tooling suite.
 
 ---
+
+![Screenshot](Screenshot%20(29038).png)
 
 ## Key Architectural Highlights
 
