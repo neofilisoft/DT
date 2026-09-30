@@ -1,3 +1,4 @@
+﻿// Copyright Neofilisoft. All Rights Reserved.
 #version 450
 
 layout(push_constant) uniform PushConstants {
