@@ -1,29 +1,17 @@
-﻿#pragma once
-// ---------------------------------------------------------------------------
-// editor/editor.h
-//
-// DTEditor - the top-level class that owns all panels and drives the ImGui
-// DockSpace layout.  Inspired by Lacrima Editor pattern.
-//
-// Usage (from main.cpp):
-//   dt::editor::Editor editor;
-//   editor.Init(application);     // pass Application& for world/renderer access
-//   // Inside the render/ImGui loop:
-//   editor.Construct();
-//   // On shutdown:
-//   editor.Shutdown();
-// ---------------------------------------------------------------------------
+#pragma once
 
 #include "editor/core/EditorContext.h"
+#include "editor/home/ProjectHome.h"
 
 #include <memory>
 #include <vector>
+#include <string>
 
-namespace dt          { class Application; }
-namespace dt::sim     { class SimulationWorld; }
-namespace dt::editor  { class EditorPanel; }
+namespace lacrima          { class Application; }
+namespace lacrima::sim     { class SimulationWorld; }
+namespace lacrima::editor  { class EditorPanel; }
 
-namespace dt::editor
+namespace lacrima::editor
 {
     class Editor
     {
@@ -34,16 +22,18 @@ namespace dt::editor
         Editor(const Editor&)            = delete;
         Editor& operator=(const Editor&) = delete;
 
-        // Must be called after ImGui and Vulkan are initialized.
-        void Init(dt::sim::SimulationWorld* world);
-
-        // Called every frame inside the ImGui render pass to draw all panels.
+        void Init(lacrima::sim::SimulationWorld* world);
         void Construct();
-
-        // Called before ImGui/Vulkan shutdown.
         void Shutdown();
+        void OnDropFile(const std::string& path);
 
         EditorContext& Context() { return m_ctx; }
+        const EditorContext& Context() const { return m_ctx; }
+
+        void SetSceneTexture(void* desc) { m_ctx.SetSceneTexture(desc); }
+        bool ConsumeViewportResizeRequest(u32& outW, u32& outH) { return m_ctx.ConsumeViewportResizeRequest(outW, outH); }
+        EditorCamera& Camera() { return m_ctx.Camera(); }
+        const EditorCamera& Camera() const { return m_ctx.Camera(); }
 
     private:
         void SetupStyle();
@@ -51,8 +41,11 @@ namespace dt::editor
         void DrawMenuBar();
 
         EditorContext                              m_ctx;
+        ProjectHome                                m_home;
         std::vector<std::shared_ptr<EditorPanel>>  m_panels;
         bool                                       m_initialized = false;
+        bool                                       m_projectLoaded = false;
         bool                                       m_dockLayoutBuilt = false;
+        bool                                       m_styleInitialized = false;
     };
 }

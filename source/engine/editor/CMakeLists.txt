@@ -1,24 +1,42 @@
-﻿# ---------------------------------------------------------------------------
-# dt_editor
-# The standalone editor library. Links against dt_renderer (ImGui/Vulkan),
-# dt_simulation, and dt_imguizmo (transform gizmos).
+# ---------------------------------------------------------------------------
+# lacrima_editor
+# The standalone editor library. Links against lacrima_renderer (ImGui/Vulkan),
+# lacrima_simulation, and lacrima_imguizmo (transform gizmos).
 # Produces a static library that DTEditor.exe links against.
 # ---------------------------------------------------------------------------
-set(DT_EDITOR_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
-set(DT_ENGINE_ROOT ${DT_EDITOR_ROOT}/..)
+set(lacrima_EDITOR_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
+set(LACRIMA_ENGINE_ROOT ${lacrima_EDITOR_ROOT}/..)
 
-file(GLOB_RECURSE DT_EDITOR_SOURCES ${DT_EDITOR_ROOT}/*.cpp)
-file(GLOB_RECURSE DT_EDITOR_HEADERS ${DT_EDITOR_ROOT}/*.h)
+file(GLOB_RECURSE lacrima_EDITOR_SOURCES ${lacrima_EDITOR_ROOT}/*.cpp)
+file(GLOB_RECURSE lacrima_EDITOR_HEADERS ${lacrima_EDITOR_ROOT}/*.h)
 
-add_library(dt_editor STATIC ${DT_EDITOR_SOURCES} ${DT_EDITOR_HEADERS})
+file(GLOB_RECURSE THIRDPARTY_SOURCES ${lacrima_EDITOR_ROOT}/thirdparty/*.cpp)
+file(GLOB_RECURSE THIRDPARTY_HEADERS ${lacrima_EDITOR_ROOT}/thirdparty/*.h)
 
-target_include_directories(dt_editor PUBLIC ${DT_ENGINE_ROOT})
+if(THIRDPARTY_SOURCES)
+    list(REMOVE_ITEM lacrima_EDITOR_SOURCES ${THIRDPARTY_SOURCES})
+endif()
+if(THIRDPARTY_HEADERS)
+    list(REMOVE_ITEM lacrima_EDITOR_HEADERS ${THIRDPARTY_HEADERS})
+endif()
 
-target_link_libraries(dt_editor PUBLIC
-    dt_renderer
-    dt_simulation
-    dt_core
-    dt_imguizmo
+add_library(lacrima_editor STATIC ${lacrima_EDITOR_SOURCES} ${lacrima_EDITOR_HEADERS})
+
+target_include_directories(lacrima_editor PUBLIC ${LACRIMA_ENGINE_ROOT})
+target_include_directories(lacrima_editor PRIVATE thirdparty/json/include)
+
+target_link_libraries(lacrima_editor PUBLIC
+    lacrima_renderer
+    lacrima_simulation
+    lacrima_core
+    lacrima_imguizmo
 )
 
-set_target_properties(dt_editor PROPERTIES FOLDER "engine")
+if(WIN32)
+    target_link_libraries(lacrima_editor PUBLIC comdlg32 shell32)
+endif()
+
+set_target_properties(lacrima_editor PROPERTIES FOLDER "engine")
+
+
+
