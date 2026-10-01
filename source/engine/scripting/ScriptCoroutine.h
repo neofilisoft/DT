@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "runtime/Entity.h"
@@ -36,7 +37,7 @@
 // instruction-pointer-persistence mechanism.
 // ---------------------------------------------------------------------------
 
-namespace dt::script
+namespace lacrima::script
 {
     class ScriptCoroutine
     {
@@ -69,11 +70,13 @@ namespace dt::script
         bool IsFinished() const { return m_finished; }
 
     private:
-        ScriptCoroutine(sol::thread runner, sol::coroutine coroutine) 
-            : m_runner(std::move(runner)), m_coroutine(std::move(coroutine)) {}
+        ScriptCoroutine(ScriptEngine* engine, sol::thread runner, sol::coroutine coroutine)
+            : m_engine(engine), m_runner(std::move(runner)), m_coroutine(std::move(coroutine)) {}
 
+        ScriptEngine* m_engine = nullptr;
         sol::thread m_runner;
         sol::coroutine m_coroutine;
         bool m_finished = false;
     };
 }
+

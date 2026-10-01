@@ -1,9 +1,11 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
 
 #include <sol/sol.hpp>
 
+#include <mutex>
 #include <optional>
 #include <string>
 
@@ -31,13 +33,13 @@
 // single-threaded C++ iteration, not itself parallelized across entities -
 // see SimulationWorld.cpp). This means all Lua calls in the current
 // pipeline are already serialized by construction. If per-entity work
-// inside a node is ever parallelized in a future milestone, ScriptEngine
+// inside a node is ever parallelized in the future, ScriptEngine
 // will need either a lock around Lua calls or (better, avoiding lock
 // contention) one lua_State per worker thread - that is an explicit,
 // documented future concern, not silently assumed safe here.
 // ---------------------------------------------------------------------------
 
-namespace dt::script
+namespace lacrima::script
 {
     class ScriptEngine
     {
@@ -59,12 +61,13 @@ namespace dt::script
 
         // Calls a global Lua function by name with the given arguments,
         // returning std::nullopt if the function doesn't exist or the call
-        // raised a Lua error (logged via DT_LOG_ERROR at the call site, see
+        // raised a Lua error (logged via LACRIMA_LOG_ERROR at the call site, see
         // .cpp - callers get a clean optional rather than needing to
         // understand sol2's error-reporting types).
         template <typename ReturnT, typename... Args>
         std::optional<ReturnT> CallGlobalFunction(const std::string& functionName, Args&&... args)
         {
+            std::lock_guard<std::recursive_mutex> lock(m_luaMutex);
             sol::protected_function func = m_lua[functionName];
             if (!func.valid())
             {
@@ -91,10 +94,14 @@ namespace dt::script
         // call site is visibly opting into direct sol2 usage, not
         // accidentally leaking sol2 types through an implicit conversion.
         sol::state& Raw() { return m_lua; }
+        std::recursive_mutex& Mutex() const { return m_luaMutex; }
 
     private:
         void LogCallError(const std::string& functionName, const sol::protected_function_result& result);
 
         sol::state m_lua;
+        mutable std::recursive_mutex m_luaMutex;
     };
 }
+
+

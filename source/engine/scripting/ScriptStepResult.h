@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -18,7 +19,7 @@
 // its own.
 // ---------------------------------------------------------------------------
 
-namespace dt::script
+namespace lacrima::script
 {
     // Named "CONTINUE" not "Running" deliberately - mirrors the
     // documented SimAntics primitive return convention ({TRUE, FALSE,
@@ -32,3 +33,4 @@ namespace dt::script
         Failed
     };
 }
+

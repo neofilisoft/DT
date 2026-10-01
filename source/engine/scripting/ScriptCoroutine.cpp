@@ -1,13 +1,17 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "scripting/ScriptCoroutine.h"
 #include "core/logging/Logger.h"
+#include <mutex>
+#include <cstdio>
 
-namespace dt::script
+namespace lacrima::script
 {
     std::optional<ScriptCoroutine> ScriptCoroutine::Create(ScriptEngine& engine, const std::string& functionName)
     {
+        std::lock_guard<std::recursive_mutex> lock(engine.Mutex());
         if (!engine.HasGlobalFunction(functionName))
         {
-            DT_LOG_ERROR(LogCategory::Scripting, "ScriptCoroutine::Create: no Lua function named '{}'", functionName);
+            LACRIMA_LOG_ERROR(LogCategory::Scripting, "ScriptCoroutine::Create: no Lua function named '{}'", functionName);
             return std::nullopt;
         }
 
@@ -24,11 +28,12 @@ namespace dt::script
         sol::function luaFunc = lua[functionName];
         sol::coroutine co(runner.state(), luaFunc);
 
-        return ScriptCoroutine(std::move(runner), std::move(co));
+        return ScriptCoroutine(&engine, std::move(runner), std::move(co));
     }
 
     ScriptStepResult ScriptCoroutine::Step(Entity actor, Entity target, f32 dt)
     {
+        std::lock_guard<std::recursive_mutex> lock(m_engine->Mutex());
         if (m_finished)
         {
             // Stepping an already-finished coroutine is a caller bug
@@ -40,12 +45,12 @@ namespace dt::script
             return ScriptStepResult::Failed;
         }
 
-        sol::protected_function_result result = m_coroutine(actor, target, dt);
+        sol::protected_function_result result = m_coroutine(std::move(actor), std::move(target), dt);
 
         if (!result.valid())
         {
             sol::error err = result;
-            DT_LOG_ERROR(LogCategory::Scripting, "ScriptCoroutine::Step: Lua error during resume: {}", err.what());
+            LACRIMA_LOG_ERROR(LogCategory::Scripting, "ScriptCoroutine::Step: Lua error during resume: {}", err.what());
             m_finished = true;
             return ScriptStepResult::Failed;
         }
@@ -54,9 +59,15 @@ namespace dt::script
         // yielded (still suspended, more work next Step()) or returned
         // (dead - this call's return value is the interaction's final
         // result, not an intermediate "continue").
-        const bool stillSuspended = (m_coroutine.status() == sol::call_status::yielded);
+        const bool statusSaysSuspended = (m_coroutine.status() == sol::call_status::yielded);
+        bool yieldedContinueValue = false;
+        if (result.return_count() > 0)
+        {
+            const sol::object yieldedValue = result.get<sol::object>(0);
+            yieldedContinueValue = yieldedValue.get_type() == sol::type::string && yieldedValue.as<std::string>() == "continue";
+        }
 
-        if (stillSuspended)
+        if (statusSaysSuspended || yieldedContinueValue)
         {
             // Intermediate yield - the yielded value is expected to be
             // "continue" by convention (see file header), but any yield at
@@ -72,14 +83,14 @@ namespace dt::script
         // final result.
         if (result.return_count() == 0)
         {
-            DT_LOG_ERROR(LogCategory::Scripting, "ScriptCoroutine::Step: run-function returned with no result; expected \"complete\" or \"failed\"");
+            LACRIMA_LOG_ERROR(LogCategory::Scripting, "ScriptCoroutine::Step: run-function returned with no result; expected \"complete\" or \"failed\"");
             return ScriptStepResult::Failed;
         }
 
         const sol::object returnValue = result.get<sol::object>(0);
         if (returnValue.get_type() != sol::type::string)
         {
-            DT_LOG_ERROR(LogCategory::Scripting, "ScriptCoroutine::Step: run-function's final return value was not a string");
+            LACRIMA_LOG_ERROR(LogCategory::Scripting, "ScriptCoroutine::Step: run-function's final return value was not a string");
             return ScriptStepResult::Failed;
         }
 
@@ -93,7 +104,9 @@ namespace dt::script
             return ScriptStepResult::Failed;
         }
 
-        DT_LOG_ERROR(LogCategory::Scripting, "ScriptCoroutine::Step: unrecognized final return value '{}' (expected \"complete\" or \"failed\")", status);
+        LACRIMA_LOG_ERROR(LogCategory::Scripting, "ScriptCoroutine::Step: unrecognized final return value '{}' (expected \"complete\" or \"failed\")", status);
         return ScriptStepResult::Failed;
     }
 }
+
+
