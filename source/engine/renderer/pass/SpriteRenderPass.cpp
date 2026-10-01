@@ -1,10 +1,12 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/pass/SpriteRenderPass.h"
 #include "renderer/vulkan/VulkanContext.h"
 #include "renderer/vulkan/VulkanMaterial.h"
 #include "core/logging/Logger.h"
+#include "core/filesystem/FileSystem.h"
 #include "core/math/Math.h"
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     // Matches push constant definition in agent_quad.vert
     struct SpritePushConstants
@@ -26,10 +28,10 @@ namespace dt::renderer
                                       VkDescriptorSetLayout uboLayout, 
                                       VkDescriptorSetLayout materialLayout)
     {
-        if (!m_vertShader.InitializeFromCookedFile(ctx, "source/engine/asset/agent_quad_vert.asset"))
+        if (!m_vertShader.InitializeFromCookedFile(ctx, FileSystem::GetEngineAssetDir() + "/agent_quad_vert.asset"))
             return false;
             
-        if (!m_fragShader.InitializeFromCookedFile(ctx, "source/engine/asset/agent_quad_frag.asset"))
+        if (!m_fragShader.InitializeFromCookedFile(ctx, FileSystem::GetEngineAssetDir() + "/agent_quad_frag.asset"))
             return false;
 
         VkDescriptorSetLayout layouts[] = { uboLayout, materialLayout };
@@ -78,7 +80,7 @@ namespace dt::renderer
 
     void SpriteRenderPass::Execute(VkCommandBuffer cmd)
     {
-        if (!m_pipeline.IsInitialized() || !m_proxies || !m_material)
+        if (!m_pipeline.IsInitialized() || !m_proxies || !m_material || !m_material->IsInitialized())
             return;
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline.Handle());
@@ -108,20 +110,19 @@ namespace dt::renderer
             pc.halfExtent[0] = 0.5f * proxy.scaleX;
             pc.halfExtent[1] = 0.5f * proxy.scaleY;
 
-            // Optional tint based on visualId (for debugging)
-            const u32 colorIndex = proxy.visualId % 6;
-            if (colorIndex == 0)
-            {
-                pc.color[0] = 1.0f; pc.color[1] = 1.0f; pc.color[2] = 1.0f; pc.color[3] = 1.0f;
-            }
-            else if (colorIndex == 1)
-            {
-                pc.color[0] = 1.0f; pc.color[1] = 1.0f; pc.color[2] = 1.0f; pc.color[3] = 1.0f;
-            }
+            const StringID visual = proxy.visualId;
+            if (visual == StringID("floor"))
+            { pc.color[0] = 0.12f; pc.color[1] = 0.17f; pc.color[2] = 0.22f; pc.color[3] = 1.0f; }
+            else if (visual == StringID("reachable"))
+            { pc.color[0] = 0.13f; pc.color[1] = 0.42f; pc.color[2] = 0.58f; pc.color[3] = 0.82f; }
+            else if (visual == StringID("cursor"))
+            { pc.color[0] = 0.95f; pc.color[1] = 0.78f; pc.color[2] = 0.24f; pc.color[3] = 0.46f; }
+            else if (visual == StringID("enemy"))
+            { pc.color[0] = 0.80f; pc.color[1] = 0.20f; pc.color[2] = 0.23f; pc.color[3] = 1.0f; }
+            else if (visual == StringID("selected"))
+            { pc.color[0] = 0.22f; pc.color[1] = 0.86f; pc.color[2] = 0.72f; pc.color[3] = 1.0f; }
             else
-            {
-                pc.color[0] = 0.5f; pc.color[1] = 0.5f; pc.color[2] = 0.5f; pc.color[3] = 1.0f;
-            }
+            { pc.color[0] = 0.25f; pc.color[1] = 0.60f; pc.color[2] = 0.92f; pc.color[3] = 1.0f; }
 
             const float kGridSize = 8.0f; // Assuming 8x8 spritesheet grid
             pc.uvScale[0] = 1.0f / kGridSize;
@@ -136,8 +137,23 @@ namespace dt::renderer
             pc.uvOffset[0] = static_cast<float>(col) / kGridSize;
             pc.uvOffset[1] = static_cast<float>(row) / kGridSize;
 
+            // Generic Sprite2D path: atlas coordinates and tint come from the simulation snapshot.
+            // The legacy visualId/grid path above remains available for existing engine samples.
+            if (proxy.isSprite2D)
+            {
+                pc.color[0] = proxy.spriteTintR;
+                pc.color[1] = proxy.spriteTintG;
+                pc.color[2] = proxy.spriteTintB;
+                pc.color[3] = proxy.spriteTintA;
+                pc.uvOffset[0] = proxy.spriteU;
+                pc.uvOffset[1] = proxy.spriteV;
+                pc.uvScale[0] = proxy.spriteWidth;
+                pc.uvScale[1] = proxy.spriteHeight;
+            }
+
             vkCmdPushConstants(cmd, m_pipeline.Layout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SpritePushConstants), &pc);
             vkCmdDraw(cmd, 6, 1, 0, 0);
         }
     }
 }
+

@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -14,7 +15,7 @@
 // Handles resource transitions and pass scheduling automatically.
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
     class VulkanCommandPool;
@@ -69,3 +70,4 @@ namespace dt::renderer
         std::vector<std::unique_ptr<RenderPass>> m_passes;
     };
 }
+

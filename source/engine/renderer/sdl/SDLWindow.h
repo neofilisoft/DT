@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -24,7 +25,7 @@
 //   - SDL event loop polling.
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class SDLWindow
     {
@@ -59,3 +60,4 @@ namespace dt::renderer
         bool        m_sdlInitialized = false;
     };
 }
+

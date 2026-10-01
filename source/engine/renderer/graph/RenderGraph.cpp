@@ -1,6 +1,7 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/graph/RenderGraph.h"
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     void RenderGraph::AddPass(std::unique_ptr<RenderPass> pass)
     {
@@ -20,3 +21,4 @@ namespace dt::renderer
         m_passes.clear();
     }
 }
+

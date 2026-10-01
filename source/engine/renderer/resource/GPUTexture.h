@@ -1,0 +1,54 @@
+// Copyright Neofilisoft. All Rights Reserved.
+#pragma once
+
+#include "core/platform/Types.h"
+#include <vulkan/vulkan.h>
+#include <string>
+
+// ---------------------------------------------------------------------------
+// GPUTexture.h
+//
+// Represents a Vulkan image and its associated memory, view, and sampler.
+// ---------------------------------------------------------------------------
+
+namespace lacrima::renderer
+{
+    class VulkanContext;
+    class VulkanMemoryAllocator;
+
+    class GPUTexture
+    {
+    public:
+        GPUTexture() = default;
+        ~GPUTexture();
+
+        // Non-copyable, non-movable
+        GPUTexture(const GPUTexture&) = delete;
+        GPUTexture& operator=(const GPUTexture&) = delete;
+        GPUTexture(GPUTexture&&) = delete;
+        GPUTexture& operator=(GPUTexture&&) = delete;
+
+        bool Initialize(VulkanContext& ctx, const VulkanMemoryAllocator& allocator,
+                        u32 width, u32 height, VkFormat format, bool pixelPerfect = false);
+        bool LoadFromMemory(VulkanContext& ctx, const VulkanMemoryAllocator& allocator, const void* data, u32 width, u32 height, VkFormat format, bool pixelPerfect = false);
+        bool LoadFromCookedFile(VulkanContext& ctx, const VulkanMemoryAllocator& allocator,
+                                const std::string& path, bool pixelPerfect = false);
+        void Shutdown(VulkanContext& ctx, const VulkanMemoryAllocator& allocator);
+
+        VkImage GetImage() const { return m_image; }
+        VkImageView GetImageView() const { return m_imageView; }
+        VkSampler GetSampler() const { return m_sampler; }
+
+    private:
+        VkImage m_image = VK_NULL_HANDLE;
+        VkDeviceMemory m_memory = VK_NULL_HANDLE;
+        VkImageView m_imageView = VK_NULL_HANDLE;
+        VkSampler m_sampler = VK_NULL_HANDLE;
+        
+        u32 m_width = 0;
+        u32 m_height = 0;
+        VkFormat m_format = VK_FORMAT_UNDEFINED;
+    };
+}
+
+

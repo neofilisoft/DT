@@ -1,14 +1,16 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/sdl/SDLWindow.h"
 
 #include "core/logging/Logger.h"
 #include "core/platform/Assert.h"
+#include "core/input/InputManager.h"
 
 #include <SDL3/SDL_vulkan.h>
 #include <imgui.h>
 
 extern bool ImGui_ImplSDL3_ProcessEvent(const SDL_Event* event);
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     SDLWindow::~SDLWindow()
     {
@@ -19,7 +21,7 @@ namespace dt::renderer
     {
         if (!SDL_Init(SDL_INIT_VIDEO))
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "SDLWindow: failed to initialize SDL video subsystem: {}", SDL_GetError());
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "SDLWindow: failed to initialize SDL video subsystem: {}", SDL_GetError());
             return false;
         }
         m_sdlInitialized = true;
@@ -27,7 +29,7 @@ namespace dt::renderer
         // Force Vulkan library load before creating window
         if (!SDL_Vulkan_LoadLibrary(nullptr))
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "SDLWindow: failed to load Vulkan library via SDL3: {}", SDL_GetError());
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "SDLWindow: failed to load Vulkan library via SDL3: {}", SDL_GetError());
             SDL_Quit();
             m_sdlInitialized = false;
             return false;
@@ -42,14 +44,14 @@ namespace dt::renderer
 
         if (m_window == nullptr)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "SDLWindow: failed to create SDL window: {}", SDL_GetError());
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "SDLWindow: failed to create SDL window: {}", SDL_GetError());
             SDL_Vulkan_UnloadLibrary();
             SDL_Quit();
             m_sdlInitialized = false;
             return false;
         }
 
-        DT_LOG_INFO(LogCategory::Renderer, "SDLWindow: created successfully ({}x{})", width, height);
+        LACRIMA_LOG_INFO(LogCategory::Renderer, "SDLWindow: created successfully ({}x{})", width, height);
         return true;
     }
 
@@ -75,7 +77,7 @@ namespace dt::renderer
         const char* const* extensions = SDL_Vulkan_GetInstanceExtensions(&count);
         if (extensions == nullptr || count == 0)
         {
-            DT_LOG_WARN(LogCategory::Renderer, "SDLWindow: failed to get required instance extensions from SDL: {}", SDL_GetError());
+            LACRIMA_LOG_WARN(LogCategory::Renderer, "SDLWindow: failed to get required instance extensions from SDL: {}", SDL_GetError());
             return {};
         }
 
@@ -89,11 +91,11 @@ namespace dt::renderer
 
     VkSurfaceKHR SDLWindow::CreateSurface(VkInstance instance)
     {
-        DT_ASSERT(m_window != nullptr, "SDLWindow::CreateSurface: window is not initialized");
+        LACRIMA_ASSERT(m_window != nullptr, "SDLWindow::CreateSurface: window is not initialized");
         VkSurfaceKHR surface = VK_NULL_HANDLE;
         if (!SDL_Vulkan_CreateSurface(m_window, instance, nullptr, &surface))
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "SDLWindow: failed to create Vulkan surface: {}", SDL_GetError());
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "SDLWindow: failed to create Vulkan surface: {}", SDL_GetError());
             return VK_NULL_HANDLE;
         }
         return surface;
@@ -107,6 +109,7 @@ namespace dt::renderer
 
         while (SDL_PollEvent(&ev))
         {
+            InputManager::Get().ProcessEvent(ev);
             // First forward events to ImGui if it is initialized
             ImGuiIO* io = ImGui::GetCurrentContext() ? &ImGui::GetIO() : nullptr;
             if (io != nullptr)
@@ -126,7 +129,7 @@ namespace dt::renderer
                 outResized = true;
                 outWidth = static_cast<u32>(ev.window.data1);
                 outHeight = static_cast<u32>(ev.window.data2);
-                DT_LOG_INFO(LogCategory::Renderer, "SDLWindow: window resized to {}x{}", outWidth, outHeight);
+                LACRIMA_LOG_INFO(LogCategory::Renderer, "SDLWindow: window resized to {}x{}", outWidth, outHeight);
             }
             else if (ev.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
             {
@@ -137,3 +140,5 @@ namespace dt::renderer
         return keepRunning;
     }
 }
+
+

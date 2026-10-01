@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "renderer/graph/RenderGraph.h"
@@ -5,7 +6,7 @@
 #include "renderer/vulkan/VulkanShader.h"
 #include "runtime/SimulationSnapshot.h"
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
     class VulkanMaterial;
@@ -43,3 +44,4 @@ namespace dt::renderer
         const std::vector<RenderProxy>* m_proxies = nullptr;
     };
 }
+

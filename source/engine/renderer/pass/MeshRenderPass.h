@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "renderer/graph/RenderGraph.h"
@@ -5,11 +6,11 @@
 #include "renderer/vulkan/VulkanShader.h"
 #include "runtime/SimulationSnapshot.h"
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
     class VulkanMaterial;
-    class GpuMesh;
+    class GPUMesh;
 
     class MeshRenderPass : public RenderPass
     {
@@ -27,7 +28,7 @@ namespace dt::renderer
         void SetupFrame(VkExtent2D extent, 
                         VkDescriptorSet globalUboSet, 
                         const VulkanMaterial* material, 
-                        const GpuMesh* mesh,
+                        const GPUMesh* mesh,
                         const std::vector<RenderProxy>* proxies);
 
         void Execute(VkCommandBuffer cmd) override;
@@ -43,7 +44,8 @@ namespace dt::renderer
         VkExtent2D m_extent;
         VkDescriptorSet m_globalUboSet = VK_NULL_HANDLE;
         const VulkanMaterial* m_material = nullptr;
-        const GpuMesh* m_mesh = nullptr;
+        const GPUMesh* m_mesh = nullptr;
         const std::vector<RenderProxy>* m_proxies = nullptr;
     };
 }
+

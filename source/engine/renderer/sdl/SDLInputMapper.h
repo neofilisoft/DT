@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include <SDL3/SDL.h>
@@ -21,7 +22,7 @@
 //   or close the game accidentally.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     class Application;
 
@@ -37,3 +38,4 @@ namespace dt
         float m_lastActiveTimeScale = 1.0f;
     };
 }
+

@@ -1,11 +1,14 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/pass/MeshRenderPass.h"
 #include "renderer/vulkan/VulkanContext.h"
 #include "renderer/vulkan/VulkanMaterial.h"
-#include "renderer/resource/GpuMesh.h"
+#include "renderer/resource/GPUMesh.h"
 #include "core/logging/Logger.h"
+#include "core/filesystem/FileSystem.h"
 #include "core/math/Math.h"
+#include <algorithm>
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     struct MeshPushConstants
     {
@@ -23,10 +26,10 @@ namespace dt::renderer
                                     VkDescriptorSetLayout uboLayout, 
                                     VkDescriptorSetLayout materialLayout)
     {
-        if (!m_vertShader.InitializeFromCookedFile(ctx, "source/engine/asset/agent_mesh_vert.asset"))
+        if (!m_vertShader.InitializeFromCookedFile(ctx, FileSystem::GetEngineAssetDir() + "/agent_mesh_vert.asset"))
             return false;
             
-        if (!m_fragShader.InitializeFromCookedFile(ctx, "source/engine/asset/agent_mesh_frag.asset"))
+        if (!m_fragShader.InitializeFromCookedFile(ctx, FileSystem::GetEngineAssetDir() + "/agent_mesh_frag.asset"))
             return false;
 
         VkDescriptorSetLayout layouts[] = { uboLayout, materialLayout };
@@ -36,13 +39,13 @@ namespace dt::renderer
         pushConstantRange.offset     = 0;
         pushConstantRange.size       = sizeof(MeshPushConstants);
 
-        // Define Vertex Input for GpuMesh::Vertex
+        // Define Vertex Input for GPUMesh::Vertex
         VkVertexInputBindingDescription bindingDescription{};
         bindingDescription.binding = 0;
         bindingDescription.stride = sizeof(Vertex);
         bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-        VkVertexInputAttributeDescription attributeDescriptions[3]{};
+        VkVertexInputAttributeDescription attributeDescriptions[4]{};
         
         // Position
         attributeDescriptions[0].binding = 0;
@@ -62,6 +65,12 @@ namespace dt::renderer
         attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
         attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
 
+        // Tangent
+        attributeDescriptions[3].binding = 0;
+        attributeDescriptions[3].location = 3;
+        attributeDescriptions[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+        attributeDescriptions[3].offset = offsetof(Vertex, tangent);
+
         VulkanPipeline::Config config{};
         config.renderPass = renderPass;
         config.vertShader = &m_vertShader;
@@ -75,7 +84,7 @@ namespace dt::renderer
         config.pVertexBindings = &bindingDescription;
         config.vertexBindingCount = 1;
         config.pVertexAttributes = attributeDescriptions;
-        config.vertexAttributeCount = 3;
+        config.vertexAttributeCount = 4;
 
         if (!m_pipeline.Initialize(ctx, config))
         {
@@ -95,7 +104,7 @@ namespace dt::renderer
     void MeshRenderPass::SetupFrame(VkExtent2D extent, 
                                     VkDescriptorSet globalUboSet, 
                                     const VulkanMaterial* material, 
-                                    const GpuMesh* mesh,
+                                    const GPUMesh* mesh,
                                     const std::vector<RenderProxy>* proxies)
     {
         m_extent = extent;
@@ -107,7 +116,7 @@ namespace dt::renderer
 
     void MeshRenderPass::Execute(VkCommandBuffer cmd)
     {
-        if (!m_pipeline.IsInitialized() || !m_proxies || !m_material || !m_mesh)
+        if (!m_pipeline.IsInitialized() || !m_proxies || !m_material || !m_material->IsInitialized() || !m_mesh)
             return;
             
         if (m_mesh->GetVertexBuffer() == VK_NULL_HANDLE || m_mesh->GetIndexBuffer() == VK_NULL_HANDLE)
@@ -143,8 +152,12 @@ namespace dt::renderer
         {
             MeshPushConstants pc{};
             pc.modelMatrix = Mat4::Translation(Vec3(proxy.positionX, proxy.positionY, proxy.positionZ));
+            const float modelScale = 0.01f * std::max(0.1f, proxy.scaleX);
+            pc.modelMatrix.m[0] = modelScale;
+            pc.modelMatrix.m[5] = modelScale;
+            pc.modelMatrix.m[10] = modelScale;
 
-            const u32 colorIndex = proxy.visualId % 6;
+            const u32 colorIndex = proxy.visualId.Value() % 6;
             if (colorIndex == 0)
             {
                 pc.color = Vec4(0.2f, 0.8f, 0.4f, 1.0f);
@@ -163,3 +176,6 @@ namespace dt::renderer
         }
     }
 }
+
+
+

@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/sdl/SDLInputMapper.h"
 
 #include "core/input/InputManager.h"
@@ -6,7 +7,7 @@
 
 #include <imgui.h>
 
-namespace dt
+namespace lacrima
 {
     bool SDLInputMapper::ProcessEvent(const SDL_Event& ev, Application& app)
     {
@@ -33,7 +34,7 @@ namespace dt
 
                 if (key == SDLK_ESCAPE)
                 {
-                    DT_LOG_INFO(LogCategory::Core, "SDLInputMapper: Esc pressed - requesting shutdown");
+                    LACRIMA_LOG_INFO(LogCategory::Core, "SDLInputMapper: Esc pressed - requesting shutdown");
                     app.RequestShutdown();
                     return false;
                 }
@@ -44,13 +45,13 @@ namespace dt
                     {
                         m_lastActiveTimeScale = currentScale;
                         app.Sim().SetTimeScale(0.0f);
-                        DT_LOG_INFO(LogCategory::Simulation,
+                        LACRIMA_LOG_INFO(LogCategory::Simulation,
                             "SDLInputMapper: Space pressed - simulation paused");
                     }
                     else
                     {
                         app.Sim().SetTimeScale(m_lastActiveTimeScale);
-                        DT_LOG_INFO(LogCategory::Simulation,
+                        LACRIMA_LOG_INFO(LogCategory::Simulation,
                             "SDLInputMapper: Space pressed - simulation resumed to {:.1f}x",
                             m_lastActiveTimeScale);
                     }
@@ -59,21 +60,21 @@ namespace dt
                 {
                     app.Sim().SetTimeScale(1.0f);
                     m_lastActiveTimeScale = 1.0f;
-                    DT_LOG_INFO(LogCategory::Simulation,
+                    LACRIMA_LOG_INFO(LogCategory::Simulation,
                         "SDLInputMapper: '1' pressed - simulation set to 1x");
                 }
                 else if (key == SDLK_2)
                 {
                     app.Sim().SetTimeScale(2.0f);
                     m_lastActiveTimeScale = 2.0f;
-                    DT_LOG_INFO(LogCategory::Simulation,
+                    LACRIMA_LOG_INFO(LogCategory::Simulation,
                         "SDLInputMapper: '2' pressed - simulation set to 2x");
                 }
                 else if (key == SDLK_8)
                 {
                     app.Sim().SetTimeScale(8.0f);
                     m_lastActiveTimeScale = 8.0f;
-                    DT_LOG_INFO(LogCategory::Simulation,
+                    LACRIMA_LOG_INFO(LogCategory::Simulation,
                         "SDLInputMapper: '8' pressed - simulation set to 8x");
                 }
             }
@@ -82,3 +83,5 @@ namespace dt
         return true;
     }
 }
+
+
