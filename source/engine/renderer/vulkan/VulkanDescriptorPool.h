@@ -1,10 +1,11 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
 #include <vulkan/vulkan.h>
 #include <vector>
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
 
@@ -30,3 +31,4 @@ namespace dt::renderer
         VkDescriptorPool m_pool = VK_NULL_HANDLE;
     };
 }
+

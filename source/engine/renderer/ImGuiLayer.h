@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -20,7 +21,7 @@
 //     needs debugger, speed controls).
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
     class VulkanSwapchain;
@@ -59,3 +60,4 @@ namespace dt::renderer
         VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
     };
 }
+

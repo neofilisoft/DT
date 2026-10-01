@@ -1,14 +1,15 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/vulkan/VulkanCommandPool.h"
 
 #include "core/logging/Logger.h"
 #include "core/platform/Assert.h"
 #include "renderer/vulkan/VulkanContext.h"
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     VulkanCommandPool::~VulkanCommandPool()
     {
-        DT_ASSERT(m_pool == VK_NULL_HANDLE,
+        LACRIMA_ASSERT(m_pool == VK_NULL_HANDLE,
             "VulkanCommandPool destroyed without calling Shutdown() - resource leak");
     }
 
@@ -21,7 +22,7 @@ namespace dt::renderer
 
         if (vkCreateCommandPool(ctx.Device(), &poolInfo, nullptr, &m_pool) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanCommandPool: failed to create VkCommandPool");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanCommandPool: failed to create VkCommandPool");
             return false;
         }
 
@@ -35,7 +36,7 @@ namespace dt::renderer
 
         if (vkAllocateCommandBuffers(ctx.Device(), &allocInfo, m_buffers.data()) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanCommandPool: failed to allocate command buffers");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanCommandPool: failed to allocate command buffers");
             return false;
         }
 
@@ -55,3 +56,5 @@ namespace dt::renderer
         m_buffers.clear();
     }
 }
+
+

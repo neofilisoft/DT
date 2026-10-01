@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/vulkan/VulkanSwapchain.h"
 
 #include "core/logging/Logger.h"
@@ -7,13 +8,13 @@
 #include <algorithm>
 #include <limits>
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     VulkanSwapchain::~VulkanSwapchain()
     {
         // Shutdown must be called explicitly by VulkanRenderer before destruction
         // so the VulkanContext reference is still valid.
-        DT_ASSERT(m_swapchain == VK_NULL_HANDLE,
+        LACRIMA_ASSERT(m_swapchain == VK_NULL_HANDLE,
             "VulkanSwapchain destroyed without calling Shutdown() - resource leak");
     }
 
@@ -65,7 +66,7 @@ namespace dt::renderer
 
         if (formats.empty() || presentModes.empty())
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanSwapchain: no valid surface formats or present modes");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanSwapchain: no valid surface formats or present modes");
             return false;
         }
 
@@ -117,7 +118,7 @@ namespace dt::renderer
         VkSwapchainKHR newSwapchain = VK_NULL_HANDLE;
         if (vkCreateSwapchainKHR(device, &ci, nullptr, &newSwapchain) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanSwapchain: vkCreateSwapchainKHR failed");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanSwapchain: vkCreateSwapchainKHR failed");
             return false;
         }
 
@@ -136,6 +137,69 @@ namespace dt::renderer
         vkGetSwapchainImagesKHR(device, m_swapchain, &actualCount, nullptr);
         m_images.resize(actualCount);
         vkGetSwapchainImagesKHR(device, m_swapchain, &actualCount, m_images.data());
+
+        // Create Depth Buffer (if a depth format is specified / requested via some mechanism)
+        // For simplicity, we just ask VulkanContext for a depth format.
+        m_depthFormat = ctx.FindDepthFormat();
+        if (m_depthFormat != VK_FORMAT_UNDEFINED)
+        {
+            VkImageCreateInfo imageInfo{};
+            imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.extent.width = extent.width;
+            imageInfo.extent.height = extent.height;
+            imageInfo.extent.depth = 1;
+            imageInfo.mipLevels = 1;
+            imageInfo.arrayLayers = 1;
+            imageInfo.format = m_depthFormat;
+            imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+            imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+            imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+            imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+            if (vkCreateImage(device, &imageInfo, nullptr, &m_depthImage) != VK_SUCCESS) {
+                LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanSwapchain: failed to create depth image");
+                return false;
+            }
+
+            VkMemoryRequirements memRequirements;
+            vkGetImageMemoryRequirements(device, m_depthImage, &memRequirements);
+
+            VkMemoryAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocInfo.allocationSize = memRequirements.size;
+            allocInfo.memoryTypeIndex = ctx.FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+            if (vkAllocateMemory(device, &allocInfo, nullptr, &m_depthImageMemory) != VK_SUCCESS) {
+                LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanSwapchain: failed to allocate depth image memory");
+                vkDestroyImage(device, m_depthImage, nullptr);
+                m_depthImage = VK_NULL_HANDLE;
+                return false;
+            }
+
+            vkBindImageMemory(device, m_depthImage, m_depthImageMemory, 0);
+
+            VkImageViewCreateInfo viewInfo{};
+            viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            viewInfo.image = m_depthImage;
+            viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            viewInfo.format = m_depthFormat;
+            viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            viewInfo.subresourceRange.baseMipLevel = 0;
+            viewInfo.subresourceRange.levelCount = 1;
+            viewInfo.subresourceRange.baseArrayLayer = 0;
+            viewInfo.subresourceRange.layerCount = 1;
+
+            if (vkCreateImageView(device, &viewInfo, nullptr, &m_depthImageView) != VK_SUCCESS) {
+                LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanSwapchain: failed to create depth image view");
+                vkFreeMemory(device, m_depthImageMemory, nullptr);
+                vkDestroyImage(device, m_depthImage, nullptr);
+                m_depthImage = VK_NULL_HANDLE;
+                m_depthImageMemory = VK_NULL_HANDLE;
+                return false;
+            }
+        }
 
         // Create image views
         m_imageViews.resize(actualCount);
@@ -158,7 +222,7 @@ namespace dt::renderer
 
             if (vkCreateImageView(device, &viewCI, nullptr, &m_imageViews[i]) != VK_SUCCESS)
             {
-                DT_LOG_ERROR(LogCategory::Renderer, "VulkanSwapchain: failed to create image view {}", i);
+                LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanSwapchain: failed to create image view {}", i);
                 return false;
             }
         }
@@ -167,25 +231,29 @@ namespace dt::renderer
         m_framebuffers.resize(actualCount);
         for (u32 i = 0; i < actualCount; ++i)
         {
-            VkImageView attachments[] = { m_imageViews[i] };
+            std::vector<VkImageView> attachments = { m_imageViews[i] };
+            if (m_depthImageView != VK_NULL_HANDLE)
+            {
+                attachments.push_back(m_depthImageView);
+            }
 
             VkFramebufferCreateInfo fbCI{};
             fbCI.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             fbCI.renderPass      = renderPass;
-            fbCI.attachmentCount = 1;
-            fbCI.pAttachments    = attachments;
+            fbCI.attachmentCount = static_cast<u32>(attachments.size());
+            fbCI.pAttachments    = attachments.data();
             fbCI.width           = m_extent.width;
             fbCI.height          = m_extent.height;
             fbCI.layers          = 1;
 
             if (vkCreateFramebuffer(device, &fbCI, nullptr, &m_framebuffers[i]) != VK_SUCCESS)
             {
-                DT_LOG_ERROR(LogCategory::Renderer, "VulkanSwapchain: failed to create framebuffer {}", i);
+                LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanSwapchain: failed to create framebuffer {}", i);
                 return false;
             }
         }
 
-        DT_LOG_INFO(LogCategory::Renderer,
+        LACRIMA_LOG_INFO(LogCategory::Renderer,
             "VulkanSwapchain: {}x{} with {} images (format={})",
             m_extent.width, m_extent.height, actualCount,
             static_cast<int>(m_imageFormat));
@@ -201,6 +269,22 @@ namespace dt::renderer
         }
         m_imageViews.clear();
         m_images.clear();
+
+        if (m_depthImageView != VK_NULL_HANDLE)
+        {
+            vkDestroyImageView(ctx.Device(), m_depthImageView, nullptr);
+            m_depthImageView = VK_NULL_HANDLE;
+        }
+        if (m_depthImage != VK_NULL_HANDLE)
+        {
+            vkDestroyImage(ctx.Device(), m_depthImage, nullptr);
+            m_depthImage = VK_NULL_HANDLE;
+        }
+        if (m_depthImageMemory != VK_NULL_HANDLE)
+        {
+            vkFreeMemory(ctx.Device(), m_depthImageMemory, nullptr);
+            m_depthImageMemory = VK_NULL_HANDLE;
+        }
     }
 
     void VulkanSwapchain::DestroyFramebuffers(VulkanContext& ctx)
@@ -250,3 +334,6 @@ namespace dt::renderer
         return extent;
     }
 }
+
+
+

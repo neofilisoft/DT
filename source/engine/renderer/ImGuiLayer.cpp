@@ -1,4 +1,6 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/ImGuiLayer.h"
+#include "core/filesystem/FileSystem.h"
 
 #include "core/logging/Logger.h"
 #include "renderer/vulkan/VulkanContext.h"
@@ -8,11 +10,11 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_vulkan.h>
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     ImGuiLayer::~ImGuiLayer()
     {
-        DT_ASSERT(m_descriptorPool == VK_NULL_HANDLE,
+        LACRIMA_ASSERT(m_descriptorPool == VK_NULL_HANDLE,
             "ImGuiLayer destroyed without calling Shutdown() - resource leak");
     }
 
@@ -48,7 +50,7 @@ namespace dt::renderer
 
         if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &m_descriptorPool) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "ImGuiLayer: failed to create ImGui VkDescriptorPool");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "ImGuiLayer: failed to create ImGui VkDescriptorPool");
             return false;
         }
 
@@ -56,8 +58,16 @@ namespace dt::renderer
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-        // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Disabled for non-docking ImGui branch
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enabled for ImGui docking branch
+
+        static std::string s_iniPath;
+        std::string exeDir = FileSystem::GetExecutableDir();
+        if (!exeDir.empty())
+            s_iniPath = FileSystem::NormalizeSeparators(exeDir + "/imgui.ini");
+        else
+            s_iniPath = "imgui.ini";
+        io.IniFilename = s_iniPath.c_str();
 
         // Set dark styling matching Neofilisoft/Balmung premium theme requirements
         ImGui::StyleColorsDark();
@@ -75,7 +85,7 @@ namespace dt::renderer
         // 3. Initialize Platform/Renderer backends
         if (!ImGui_ImplSDL3_InitForVulkan(window))
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "ImGuiLayer: failed to initialize ImGui SDL3 platform backend");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "ImGuiLayer: failed to initialize ImGui SDL3 platform backend");
             vkDestroyDescriptorPool(device, m_descriptorPool, nullptr);
             m_descriptorPool = VK_NULL_HANDLE;
             ImGui::DestroyContext();
@@ -95,9 +105,30 @@ namespace dt::renderer
         initInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
         initInfo.PipelineInfoMain.RenderPass = renderPass;
 
+        if (!ImGui_ImplVulkan_LoadFunctions(
+                VK_API_VERSION_1_2,
+                [](const char* functionName, void* userData) -> PFN_vkVoidFunction
+                {
+                    auto* vulkanContext = static_cast<VulkanContext*>(userData);
+                    if (vulkanContext->Device() != VK_NULL_HANDLE)
+                    {
+                        if (PFN_vkVoidFunction deviceFunction = vkGetDeviceProcAddr(vulkanContext->Device(), functionName))
+                            return deviceFunction;
+                    }
+                    return vkGetInstanceProcAddr(vulkanContext->Instance(), functionName);
+                },
+                &ctx))
+        {
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "ImGuiLayer: failed to load Vulkan function pointers");
+            ImGui_ImplSDL3_Shutdown();
+            vkDestroyDescriptorPool(device, m_descriptorPool, nullptr);
+            m_descriptorPool = VK_NULL_HANDLE;
+            ImGui::DestroyContext();
+            return false;
+        }
         if (!ImGui_ImplVulkan_Init(&initInfo))
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "ImGuiLayer: failed to initialize ImGui Vulkan rendering backend");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "ImGuiLayer: failed to initialize ImGui Vulkan rendering backend");
             ImGui_ImplSDL3_Shutdown();
             vkDestroyDescriptorPool(device, m_descriptorPool, nullptr);
             m_descriptorPool = VK_NULL_HANDLE;
@@ -107,7 +138,7 @@ namespace dt::renderer
 
         // Font texture is uploaded automatically inside NewFrame in this ImGui version.
 
-        DT_LOG_INFO(LogCategory::Renderer, "ImGuiLayer: initialized successfully");
+        LACRIMA_LOG_INFO(LogCategory::Renderer, "ImGuiLayer: initialized successfully");
         return true;
     }
 
@@ -123,7 +154,7 @@ namespace dt::renderer
         vkDestroyDescriptorPool(ctx.Device(), m_descriptorPool, nullptr);
         m_descriptorPool = VK_NULL_HANDLE;
 
-        DT_LOG_INFO(LogCategory::Renderer, "ImGuiLayer: shut down");
+        LACRIMA_LOG_INFO(LogCategory::Renderer, "ImGuiLayer: shut down");
     }
 
     void ImGuiLayer::BeginFrame()
@@ -252,7 +283,6 @@ namespace dt::renderer
         }
         ImGui::End();
 
-        ImGui::Render();
     }
 
     void ImGuiLayer::Render(VkCommandBuffer cmd)
@@ -260,3 +290,6 @@ namespace dt::renderer
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
     }
 }
+
+
+

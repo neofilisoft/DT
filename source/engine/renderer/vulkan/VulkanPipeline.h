@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -17,7 +18,7 @@
 //   - Push constant range for per-agent position, size, and color.
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
     class VulkanShader;
@@ -67,3 +68,4 @@ namespace dt::renderer
         VkPipelineLayout      m_layout              = VK_NULL_HANDLE;
     };
 }
+

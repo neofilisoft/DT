@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -21,7 +22,7 @@
 // mapped directly using Map()/Unmap() to write data from the CPU.
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
 
@@ -70,3 +71,4 @@ namespace dt::renderer
         void*          m_mapped = nullptr;
     };
 }
+

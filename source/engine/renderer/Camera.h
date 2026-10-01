@@ -1,8 +1,9 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/math/Math.h"
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     // A standalone, renderer-driven camera system.
     // Handles calculation of View and Projection matrices based on input or programmatic control.
@@ -39,3 +40,4 @@ namespace dt::renderer
         bool m_isDirty = true;
     };
 }
+

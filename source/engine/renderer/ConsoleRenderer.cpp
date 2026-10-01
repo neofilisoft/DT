@@ -1,23 +1,24 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/ConsoleRenderer.h"
 
 #include "core/logging/Logger.h"
 
 #include <cstdio>
 
-namespace dt
+namespace lacrima
 {
     bool ConsoleRenderer::Initialize()
     {
-        DT_LOG_INFO(LogCategory::Renderer, "ConsoleRenderer initialized (stand-in backend, no window/GPU)");
+        LACRIMA_LOG_INFO(LogCategory::Renderer, "ConsoleRenderer initialized (stand-in backend, no window/GPU)");
         return true;
     }
 
     void ConsoleRenderer::Shutdown()
     {
-        DT_LOG_INFO(LogCategory::Renderer, "ConsoleRenderer shutdown after {} frames", m_framesRendered);
+        LACRIMA_LOG_INFO(LogCategory::Renderer, "ConsoleRenderer shutdown after {} frames", m_framesRendered);
     }
 
-    void ConsoleRenderer::Render(const SimSnapshot& snapshot)
+    bool ConsoleRenderer::Render(const SimSnapshot& snapshot)
     {
         ++m_framesRendered;
 
@@ -32,3 +33,6 @@ namespace dt
         std::fflush(stdout);
     }
 }
+
+
+

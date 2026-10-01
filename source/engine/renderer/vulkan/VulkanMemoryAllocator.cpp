@@ -1,8 +1,9 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/vulkan/VulkanMemoryAllocator.h"
 #include "renderer/vulkan/VulkanContext.h"
 #include "core/logging/Logger.h"
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     bool VulkanMemoryAllocator::Initialize(const VulkanContext* context)
     {
@@ -44,14 +45,14 @@ namespace dt::renderer
 
         if (!found)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanMemoryAllocator: failed to find suitable memory type for buffer");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanMemoryAllocator: failed to find suitable memory type for buffer");
             return VK_NULL_HANDLE;
         }
 
         VkDeviceMemory memory = VK_NULL_HANDLE;
         if (vkAllocateMemory(m_context->Device(), &allocInfo, nullptr, &memory) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanMemoryAllocator: failed to allocate buffer memory");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanMemoryAllocator: failed to allocate buffer memory");
             return VK_NULL_HANDLE;
         }
 
@@ -88,14 +89,14 @@ namespace dt::renderer
 
         if (!found)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanMemoryAllocator: failed to find suitable memory type for image");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanMemoryAllocator: failed to find suitable memory type for image");
             return VK_NULL_HANDLE;
         }
 
         VkDeviceMemory memory = VK_NULL_HANDLE;
         if (vkAllocateMemory(m_context->Device(), &allocInfo, nullptr, &memory) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanMemoryAllocator: failed to allocate image memory");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanMemoryAllocator: failed to allocate image memory");
             return VK_NULL_HANDLE;
         }
 
@@ -111,3 +112,5 @@ namespace dt::renderer
         }
     }
 }
+
+

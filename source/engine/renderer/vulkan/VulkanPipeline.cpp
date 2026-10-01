@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/vulkan/VulkanPipeline.h"
 
 #include "core/logging/Logger.h"
@@ -7,11 +8,11 @@
 
 #include <vector>
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     VulkanPipeline::~VulkanPipeline()
     {
-        DT_ASSERT(m_pipeline == VK_NULL_HANDLE,
+        LACRIMA_ASSERT(m_pipeline == VK_NULL_HANDLE,
             "VulkanPipeline destroyed without calling Shutdown() - resource leak");
     }
 
@@ -29,22 +30,31 @@ namespace dt::renderer
 
         if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_layout) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanPipeline: failed to create VkPipelineLayout");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanPipeline: failed to create VkPipelineLayout");
             return false;
         }
 
         // 2. Shader Stages
-        VkPipelineShaderStageCreateInfo shaderStages[2]{};
+        std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+        if (config.vertShader)
+        {
+            VkPipelineShaderStageCreateInfo vertStageInfo{};
+            vertStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vertStageInfo.stage  = VK_SHADER_STAGE_VERTEX_BIT;
+            vertStageInfo.module = config.vertShader->Handle();
+            vertStageInfo.pName  = "main";
+            shaderStages.push_back(vertStageInfo);
+        }
 
-        shaderStages[0].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shaderStages[0].stage  = VK_SHADER_STAGE_VERTEX_BIT;
-        shaderStages[0].module = config.vertShader->Handle();
-        shaderStages[0].pName  = "main";
-
-        shaderStages[1].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shaderStages[1].stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
-        shaderStages[1].module = config.fragShader->Handle();
-        shaderStages[1].pName  = "main";
+        if (config.fragShader)
+        {
+            VkPipelineShaderStageCreateInfo fragStageInfo{};
+            fragStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            fragStageInfo.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
+            fragStageInfo.module = config.fragShader->Handle();
+            fragStageInfo.pName  = "main";
+            shaderStages.push_back(fragStageInfo);
+        }
 
         // 3. Vertex Input State
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
@@ -127,21 +137,21 @@ namespace dt::renderer
         VkPipelineColorBlendStateCreateInfo colorBlending{};
         colorBlending.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
         colorBlending.logicOpEnable   = VK_FALSE;
-        colorBlending.attachmentCount = 1;
-        colorBlending.pAttachments    = &colorBlendAttachment;
+        colorBlending.attachmentCount = config.fragShader ? 1 : 0;
+        colorBlending.pAttachments    = config.fragShader ? &colorBlendAttachment : nullptr;
 
         // 10. Create Graphics Pipeline
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-        pipelineInfo.stageCount          = 2;
-        pipelineInfo.pStages             = shaderStages;
+        pipelineInfo.stageCount          = static_cast<u32>(shaderStages.size());
+        pipelineInfo.pStages             = shaderStages.data();
         pipelineInfo.pVertexInputState   = &vertexInputInfo;
         pipelineInfo.pInputAssemblyState = &inputAssembly;
         pipelineInfo.pViewportState      = &viewportState;
         pipelineInfo.pRasterizationState = &rasterizer;
         pipelineInfo.pMultisampleState   = &multisampling;
         pipelineInfo.pDepthStencilState  = &depthStencil;
-        pipelineInfo.pColorBlendState    = &colorBlending;
+        pipelineInfo.pColorBlendState    = config.fragShader ? &colorBlending : nullptr;
         pipelineInfo.pDynamicState       = &dynamicState;
         pipelineInfo.layout              = m_layout;
         pipelineInfo.renderPass          = config.renderPass;
@@ -149,7 +159,7 @@ namespace dt::renderer
 
         if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanPipeline: failed to create VkPipeline");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanPipeline: failed to create VkPipeline");
             vkDestroyPipelineLayout(device, m_layout, nullptr);
             m_layout              = VK_NULL_HANDLE;
             return false;
@@ -177,3 +187,5 @@ namespace dt::renderer
         }
     }
 }
+
+

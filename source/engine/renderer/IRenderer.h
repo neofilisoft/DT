@@ -1,6 +1,9 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "runtime/SimulationSnapshot.h"
+#include <functional>
+#include <string>
 
 // ---------------------------------------------------------------------------
 // IRenderer.h
@@ -8,7 +11,7 @@
 // The entire contract a renderer backend must satisfy. Notice what is NOT
 // here: no access to JobSystem, no access to Simulation module internals,
 // no Handle<T>-based lookups into ComponentArray<T>. A renderer backend
-// (this milestone's ConsoleRenderer; a future VulkanRenderer) receives
+// (e.g. ConsoleRenderer; VulkanRenderer) receives
 // only a SimSnapshot - a flat, POD-only, already-computed projection of
 // what to draw - and nothing else. This is the concrete mechanism behind
 // "Renderer must not modify Simulation state": a VulkanRenderer literally
@@ -19,7 +22,7 @@
 // constructed at startup.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     class IRenderer
     {
@@ -35,12 +38,17 @@ namespace dt
 
         // Called once per render frame with the latest available
         // snapshot. Implementations must treat `snapshot` as read-only.
-        virtual void Render(const SimSnapshot& snapshot) = 0;
+        virtual bool Render(const SimSnapshot& snapshot) = 0;
 
         // Render-thread pacing target in frames/sec, independent of the
         // simulation's tick rate (see SimulationLoop.h) - this is exactly
         // the "Renderer 120 FPS while Simulation runs at 480 Tick/s at
         // x8" split from the architecture discussion.
         virtual f32 TargetFramesPerSecond() const { return 60.0f; }
+
+        using DropCallback = std::function<void(const std::string&)>;
+        virtual void SetDropCallback(DropCallback cb) {}
     };
 }
+
+

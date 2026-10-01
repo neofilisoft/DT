@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -9,7 +10,7 @@
 // A simple RAII wrapper for Vulkan memory allocation.
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
 
@@ -41,3 +42,4 @@ namespace dt::renderer
         const VulkanContext* m_context = nullptr;
     };
 }
+

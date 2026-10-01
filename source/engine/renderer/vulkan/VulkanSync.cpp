@@ -1,14 +1,15 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/vulkan/VulkanSync.h"
 
 #include "core/logging/Logger.h"
 #include "core/platform/Assert.h"
 #include "renderer/vulkan/VulkanContext.h"
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     VulkanSync::~VulkanSync()
     {
-        DT_ASSERT(m_inFlightFences.empty(),
+        LACRIMA_ASSERT(m_inFlightFences.empty(),
             "VulkanSync destroyed without calling Shutdown() - resource leak");
     }
 
@@ -34,7 +35,7 @@ namespace dt::renderer
                 vkCreateSemaphore(device, &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]) != VK_SUCCESS ||
                 vkCreateFence(device, &fenceInfo, nullptr, &m_inFlightFences[i]) != VK_SUCCESS)
             {
-                DT_LOG_ERROR(LogCategory::Renderer, "VulkanSync: failed to create synchronization primitives for frame {}", i);
+                LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanSync: failed to create synchronization primitives for frame {}", i);
                 return false;
             }
         }
@@ -70,3 +71,5 @@ namespace dt::renderer
         m_inFlightFences.clear();
     }
 }
+
+

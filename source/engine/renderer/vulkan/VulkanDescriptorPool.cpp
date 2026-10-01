@@ -1,13 +1,14 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/vulkan/VulkanDescriptorPool.h"
 #include "renderer/vulkan/VulkanContext.h"
 #include "core/logging/Logger.h"
 #include "core/platform/Assert.h"
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     VulkanDescriptorPool::~VulkanDescriptorPool()
     {
-        DT_ASSERT(m_pool == VK_NULL_HANDLE, "VulkanDescriptorPool destroyed without calling Shutdown()");
+        LACRIMA_ASSERT(m_pool == VK_NULL_HANDLE, "VulkanDescriptorPool destroyed without calling Shutdown()");
     }
 
     bool VulkanDescriptorPool::Initialize(VulkanContext& ctx, u32 maxSets, u32 maxUniformBuffers, u32 maxImageSamplers)
@@ -31,7 +32,7 @@ namespace dt::renderer
 
         if (vkCreateDescriptorPool(ctx.Device(), &poolInfo, nullptr, &m_pool) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanDescriptorPool: failed to create descriptor pool");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanDescriptorPool: failed to create descriptor pool");
             return false;
         }
 
@@ -57,7 +58,7 @@ namespace dt::renderer
 
         if (vkAllocateDescriptorSets(ctx.Device(), &allocInfo, &outSet) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanDescriptorPool: failed to allocate descriptor set");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanDescriptorPool: failed to allocate descriptor set");
             return false;
         }
 
@@ -72,3 +73,5 @@ namespace dt::renderer
         }
     }
 }
+
+

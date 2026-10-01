@@ -1,6 +1,7 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/Camera.h"
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     Camera::Camera()
         : m_position(0.0f, 0.0f, 0.0f), m_pitch(0.0f), m_yaw(0.0f), m_isDirty(true)
@@ -54,3 +55,4 @@ namespace dt::renderer
         m_isDirty = false;
     }
 }
+

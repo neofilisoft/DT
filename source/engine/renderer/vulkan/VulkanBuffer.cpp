@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/vulkan/VulkanBuffer.h"
 
 #include "core/logging/Logger.h"
@@ -6,11 +7,11 @@
 
 #include <cstring>
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     VulkanBuffer::~VulkanBuffer()
     {
-        DT_ASSERT(m_buffer == VK_NULL_HANDLE,
+        LACRIMA_ASSERT(m_buffer == VK_NULL_HANDLE,
             "VulkanBuffer destroyed without calling Shutdown() - resource leak");
     }
 
@@ -30,7 +31,7 @@ namespace dt::renderer
 
         if (vkCreateBuffer(device, &bufferInfo, nullptr, &m_buffer) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanBuffer: failed to create VkBuffer of size {}", size);
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanBuffer: failed to create VkBuffer of size {}", size);
             return false;
         }
 
@@ -44,7 +45,7 @@ namespace dt::renderer
 
         if (vkAllocateMemory(device, &allocInfo, nullptr, &m_memory) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanBuffer: failed to allocate device memory");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanBuffer: failed to allocate device memory");
             vkDestroyBuffer(device, m_buffer, nullptr);
             m_buffer = VK_NULL_HANDLE;
             return false;
@@ -93,7 +94,7 @@ namespace dt::renderer
         VkDevice device = ctx.Device();
         if (vkMapMemory(device, m_memory, 0, m_size, 0, &m_mapped) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanBuffer: failed to map device memory");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanBuffer: failed to map device memory");
             m_mapped = nullptr;
         }
         return m_mapped;
@@ -121,11 +122,13 @@ namespace dt::renderer
 
     void VulkanBuffer::CopyData(VulkanContext& ctx, const void* data, VkDeviceSize size)
     {
-        DT_ASSERT(m_mapped != nullptr,
+        LACRIMA_ASSERT(m_mapped != nullptr,
             "VulkanBuffer::CopyData called on unmapped or non-host-visible buffer");
-        DT_ASSERT(size <= m_size,
+        LACRIMA_ASSERT(size <= m_size,
             "VulkanBuffer::CopyData overflow: size exceeds buffer size");
 
         std::memcpy(m_mapped, data, size);
     }
 }
+
+

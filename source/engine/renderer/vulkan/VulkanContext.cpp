@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/vulkan/VulkanContext.h"
 
 #include "core/logging/Logger.h"
@@ -11,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     // Validation layer and extension names used in debug builds.
     static constexpr const char* kValidationLayerName = "VK_LAYER_KHRONOS_validation";
@@ -19,7 +20,7 @@ namespace dt::renderer
 
     // ---------------------------------------------------------------------------
 
-    bool VulkanContext::Initialize(const CreateInfo& ci)
+    bool VulkanContext::InitializeInstance(const CreateInfo& ci)
     {
         m_validationEnabled = ci.enableValidation;
 
@@ -27,18 +28,17 @@ namespace dt::renderer
             return false;
 
         if (m_validationEnabled)
-        {
-            if (!SetupDebugMessenger())
-            {
-                DT_LOG_WARN(LogCategory::Renderer,
-                    "VulkanContext: debug messenger setup failed - validation output will be missing");
-            }
-        }
+            SetupDebugMessenger();
 
-        if (!SelectPhysicalDevice(ci.surface, ci.deviceExtensions))
+        return true;
+    }
+
+    bool VulkanContext::InitializeDevice(VkSurfaceKHR surface, const std::vector<const char*>& deviceExtensions)
+    {
+        if (!SelectPhysicalDevice(surface, deviceExtensions))
             return false;
 
-        if (!CreateLogicalDevice(ci.deviceExtensions))
+        if (!CreateLogicalDevice(deviceExtensions))
             return false;
 
         // One-time command pool for buffer copies and image layout transitions
@@ -50,13 +50,14 @@ namespace dt::renderer
 
         if (vkCreateCommandPool(m_device, &poolCI, nullptr, &m_oneTimePool) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer,
+            LACRIMA_LOG_ERROR(LogCategory::Renderer,
                 "VulkanContext: failed to create one-time command pool");
             return false;
         }
 
-        DT_LOG_INFO(LogCategory::Renderer,
+        LACRIMA_LOG_INFO(LogCategory::Renderer,
             "VulkanContext: initialized (validation={})", m_validationEnabled);
+
         return true;
     }
 
@@ -89,7 +90,7 @@ namespace dt::renderer
             m_instance = VK_NULL_HANDLE;
         }
 
-        DT_LOG_INFO(LogCategory::Renderer, "VulkanContext: shut down");
+        LACRIMA_LOG_INFO(LogCategory::Renderer, "VulkanContext: shut down");
     }
 
     VulkanContext::~VulkanContext()
@@ -120,7 +121,7 @@ namespace dt::renderer
             }
             if (!found)
             {
-                DT_LOG_WARN(LogCategory::Renderer,
+                LACRIMA_LOG_WARN(LogCategory::Renderer,
                     "VulkanContext: validation layer '{}' not available - "
                     "install the Vulkan SDK or run without validation",
                     kValidationLayerName);
@@ -130,9 +131,9 @@ namespace dt::renderer
 
         VkApplicationInfo appInfo{};
         appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName   = "Domaintic";
+        appInfo.pApplicationName   = "Lacrima";
         appInfo.applicationVersion = VK_MAKE_VERSION(0, 9, 0); // M9
-        appInfo.pEngineName        = "DTEngine";
+        appInfo.pEngineName        = "Lacrima Engine";
         appInfo.engineVersion      = VK_MAKE_VERSION(0, 5, 0);
         appInfo.apiVersion         = VK_API_VERSION_1_2;
 
@@ -155,7 +156,7 @@ namespace dt::renderer
 
         if (vkCreateInstance(&instCI, nullptr, &m_instance) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer,
+            LACRIMA_LOG_ERROR(LogCategory::Renderer,
                 "VulkanContext: vkCreateInstance failed");
             return false;
         }
@@ -169,7 +170,7 @@ namespace dt::renderer
         vkEnumeratePhysicalDevices(m_instance, &count, nullptr);
         if (count == 0)
         {
-            DT_LOG_ERROR(LogCategory::Renderer,
+            LACRIMA_LOG_ERROR(LogCategory::Renderer,
                 "VulkanContext: no Vulkan-capable GPU found");
             return false;
         }
@@ -242,7 +243,7 @@ namespace dt::renderer
 
         if (best == VK_NULL_HANDLE)
         {
-            DT_LOG_ERROR(LogCategory::Renderer,
+            LACRIMA_LOG_ERROR(LogCategory::Renderer,
                 "VulkanContext: no suitable GPU found (check device extensions and queue support)");
             return false;
         }
@@ -251,7 +252,7 @@ namespace dt::renderer
 
         VkPhysicalDeviceProperties props{};
         vkGetPhysicalDeviceProperties(m_physicalDevice, &props);
-        DT_LOG_INFO(LogCategory::Renderer,
+        LACRIMA_LOG_INFO(LogCategory::Renderer,
             "VulkanContext: selected GPU: {}", props.deviceName);
 
         // Find queue family indices
@@ -314,7 +315,7 @@ namespace dt::renderer
 
         if (vkCreateDevice(m_physicalDevice, &devCI, nullptr, &m_device) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanContext: vkCreateDevice failed");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanContext: vkCreateDevice failed");
             return false;
         }
 
@@ -351,11 +352,11 @@ namespace dt::renderer
     {
         if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "[Vulkan Validation] {}", data->pMessage);
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "[Vulkan Validation] {}", data->pMessage);
         }
         else if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
         {
-            DT_LOG_WARN(LogCategory::Renderer, "[Vulkan Validation] {}", data->pMessage);
+            LACRIMA_LOG_WARN(LogCategory::Renderer, "[Vulkan Validation] {}", data->pMessage);
         }
         return VK_FALSE; // Do not abort the Vulkan call that triggered the message
     }
@@ -376,10 +377,40 @@ namespace dt::renderer
             }
         }
 
-        DT_ASSERT(false,
+        LACRIMA_ASSERT(false,
             "VulkanContext::FindMemoryType: no matching memory type found");
         return 0; // unreachable in debug; in release this would be UB, but that's
                   // a developer bug (wrong filter), not a recoverable error.
+    }
+
+    VkFormat VulkanContext::FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) const
+    {
+        for (VkFormat format : candidates)
+        {
+            VkFormatProperties props;
+            vkGetPhysicalDeviceFormatProperties(m_physicalDevice, format, &props);
+
+            if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features)
+            {
+                return format;
+            }
+            else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features)
+            {
+                return format;
+            }
+        }
+        return VK_FORMAT_UNDEFINED;
+    }
+
+    VkFormat VulkanContext::FindDepthFormat() const
+    {
+        VkFormat format = FindSupportedFormat(
+            {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+        );
+        LACRIMA_ASSERT(format != VK_FORMAT_UNDEFINED, "VulkanContext: Failed to find supported depth format!");
+        return format;
     }
 
     VkCommandBuffer VulkanContext::BeginOneTimeCommands()
@@ -391,27 +422,47 @@ namespace dt::renderer
         allocInfo.commandBufferCount = 1;
 
         VkCommandBuffer cmd = VK_NULL_HANDLE;
-        vkAllocateCommandBuffers(m_device, &allocInfo, &cmd);
+        if (vkAllocateCommandBuffers(m_device, &allocInfo, &cmd) != VK_SUCCESS)
+        {
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanContext: failed to allocate one-time command buffer");
+            return VK_NULL_HANDLE;
+        }
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        vkBeginCommandBuffer(cmd, &beginInfo);
+        if (vkBeginCommandBuffer(cmd, &beginInfo) != VK_SUCCESS)
+        {
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanContext: failed to begin one-time command buffer");
+            vkFreeCommandBuffers(m_device, m_oneTimePool, 1, &cmd);
+            return VK_NULL_HANDLE;
+        }
 
         return cmd;
     }
 
     void VulkanContext::EndOneTimeCommands(VkCommandBuffer cmd)
     {
-        vkEndCommandBuffer(cmd);
+        if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
+        {
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanContext: failed to end one-time command buffer");
+            vkFreeCommandBuffers(m_device, m_oneTimePool, 1, &cmd);
+            return;
+        }
 
         VkSubmitInfo submit{};
         submit.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submit.commandBufferCount = 1;
         submit.pCommandBuffers    = &cmd;
 
-        vkQueueSubmit(m_graphicsQueue, 1, &submit, VK_NULL_HANDLE);
+        if (vkQueueSubmit(m_graphicsQueue, 1, &submit, VK_NULL_HANDLE) != VK_SUCCESS)
+        {
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanContext: vkQueueSubmit failed in EndOneTimeCommands");
+        }
         vkQueueWaitIdle(m_graphicsQueue);
         vkFreeCommandBuffers(m_device, m_oneTimePool, 1, &cmd);
     }
 }
+
+
+

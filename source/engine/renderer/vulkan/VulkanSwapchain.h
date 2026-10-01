@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -28,7 +29,7 @@
 //                 falling back to VK_PRESENT_MODE_FIFO_KHR (always available).
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
 
@@ -79,9 +80,15 @@ namespace dt::renderer
 
         VkSwapchainKHR           m_swapchain    = VK_NULL_HANDLE;
         VkFormat                 m_imageFormat  = VK_FORMAT_UNDEFINED;
+        VkFormat                 m_depthFormat  = VK_FORMAT_UNDEFINED;
         VkExtent2D               m_extent       = {};
         std::vector<VkImage>     m_images;
         std::vector<VkImageView> m_imageViews;
         std::vector<VkFramebuffer> m_framebuffers;
+
+        VkImage                  m_depthImage       = VK_NULL_HANDLE;
+        VkDeviceMemory           m_depthImageMemory = VK_NULL_HANDLE;
+        VkImageView              m_depthImageView   = VK_NULL_HANDLE;
     };
 }
+

@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -30,7 +31,7 @@
 // user e.g. switches display HDR settings).
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
 
@@ -45,7 +46,7 @@ namespace dt::renderer
         VulkanRenderPass(VulkanRenderPass&&)                 = delete;
         VulkanRenderPass& operator=(VulkanRenderPass&&)      = delete;
 
-        bool Initialize(VulkanContext& ctx, VkFormat colorFormat);
+        bool Initialize(VulkanContext& ctx, VkFormat colorFormat, VkFormat depthFormat = VK_FORMAT_UNDEFINED);
         void Shutdown(VulkanContext& ctx);
 
         VkRenderPass Handle() const { return m_renderPass; }
@@ -55,3 +56,4 @@ namespace dt::renderer
         VkRenderPass m_renderPass = VK_NULL_HANDLE;
     };
 }
+

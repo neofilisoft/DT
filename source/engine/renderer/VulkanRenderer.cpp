@@ -1,5 +1,7 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/VulkanRenderer.h"
 
+#include "core/filesystem/FileSystem.h"
 #include "core/input/InputManager.h"
 #include "core/logging/Logger.h"
 #include "runtime/Application.h"
@@ -11,7 +13,7 @@
 
 #include <vector>
 
-namespace dt
+namespace lacrima
 {
     static constexpr u32 kMaxFramesInFlight = 2;
 
@@ -21,12 +23,12 @@ namespace dt
 
     bool VulkanRenderer::Initialize()
     {
-        DT_LOG_INFO(LogCategory::Renderer, "VulkanRenderer: initializing window and Vulkan backend...");
+        LACRIMA_LOG_INFO(LogCategory::Renderer, "VulkanRenderer: initializing window and Vulkan backend...");
 
         // 1. Initialize SDL Window
-        if (!m_window.Initialize("Domaintic - DTEngine", m_width, m_height))
+        if (!m_window.Initialize(m_windowTitle, m_width, m_height))
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: window initialization failed");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: window initialization failed");
             return false;
         }
 
@@ -39,44 +41,24 @@ namespace dt
         ctxCI.deviceExtensions   = deviceExtensions;
         ctxCI.enableValidation   = true; 
 
-        // Temporary Vulkan instance to create surface for physical device selection
-        VkInstance tempInstance = VK_NULL_HANDLE;
-        VkApplicationInfo appInfo{};
-        appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName   = "DomainticTemp";
-        appInfo.apiVersion         = VK_API_VERSION_1_2;
-
-        VkInstanceCreateInfo instCI{};
-        instCI.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        instCI.pApplicationInfo        = &appInfo;
-        instCI.enabledExtensionCount   = static_cast<u32>(instanceExtensions.size());
-        instCI.ppEnabledExtensionNames = instanceExtensions.data();
-
-        if (vkCreateInstance(&instCI, nullptr, &tempInstance) != VK_SUCCESS)
-            return false;
-
-        VkSurfaceKHR tempSurface = m_window.CreateSurface(tempInstance);
-        if (tempSurface == VK_NULL_HANDLE)
+        // 3. Initialize Vulkan Instance
+        if (!m_context.InitializeInstance(ctxCI))
         {
-            vkDestroyInstance(tempInstance, nullptr);
             return false;
         }
 
-        ctxCI.surface = tempSurface;
-
-        if (!m_context.Initialize(ctxCI))
-        {
-            SDL_Vulkan_DestroySurface(tempInstance, tempSurface, nullptr);
-            vkDestroyInstance(tempInstance, nullptr);
-            return false;
-        }
-
-        SDL_Vulkan_DestroySurface(tempInstance, tempSurface, nullptr);
-        vkDestroyInstance(tempInstance, nullptr);
-
+        // 4. Create Window Surface
         m_surface = m_window.CreateSurface(m_context.Instance());
         if (m_surface == VK_NULL_HANDLE)
             return false;
+
+        // 5. Initialize Logical Device & Select Physical Device
+        if (!m_context.InitializeDevice(m_surface, deviceExtensions))
+        {
+            SDL_Vulkan_DestroySurface(m_context.Instance(), m_surface, nullptr);
+            m_surface = VK_NULL_HANDLE;
+            return false;
+        }
 
         VkSurfaceFormatKHR surfaceFormat{};
         u32 formatCount = 0;
@@ -100,15 +82,16 @@ namespace dt
             if (!found) colorFormat = formats[0].format;
         }
 
-        if (!m_renderPass.Initialize(m_context, colorFormat)) return false;
+        const VkFormat depthFormat = m_context.FindDepthFormat();
+        if (!m_renderPass.Initialize(m_context, colorFormat, depthFormat)) return false;
         if (!m_swapchain.Initialize(m_context, m_surface, m_renderPass.Handle(), m_width, m_height)) return false;
         if (!m_commandPool.Initialize(m_context, m_swapchain.ImageCount())) return false;
-        if (!m_sync.Initialize(m_context, kMaxFramesInFlight)) return false;
+        if (!m_sync.Initialize(m_context, m_swapchain.ImageCount())) return false;
         if (!m_allocator.Initialize(&m_context)) return false;
         
         // Systems Initialization
         m_camera.SetPerspective(math::DegToRad(60.0f), (float)m_width / (float)m_height, 0.1f, 1000.0f);
-        m_camera.SetTransform(Vec3(0.0f, 10.0f, 10.0f), math::DegToRad(-45.0f), 0.0f);
+        m_camera.LookAt(Vec3(0.0f, 4.0f, 7.0f), Vec3(0.0f, 0.9f, 0.0f), Vec3(0.0f, 1.0f, 0.0f));
 
         if (!m_descriptorPool.Initialize(m_context, 10, 10, 10)) return false;
 
@@ -148,24 +131,55 @@ namespace dt
         // Material Layout
         renderer::VulkanMaterial::CreateDescriptorSetLayout(m_context, m_materialLayout);
 
-        // Load test texture and create material
-        if (m_testTexture.LoadFromCookedFile(m_context, m_allocator, "source/engine/asset/PixelSpaces_Free_Pack.asset"))
+        // Default PBR Textures
+        u32 whitePixel = 0xFFFFFFFF; // RGBA White (Albedo, AO)
+        u32 flatNormal = 0xFFFF8080; // RGBA (128, 128, 255, 255) -> ABGR little endian
+        u32 blackPixel = 0xFF000000; // RGBA Black (Emissive)
+        u32 defaultMR  = 0xFFFF0000; // RGBA (0, 0, 255, 255) -> metallic=0, roughness=1 (roughness is G channel, wait: freely says bg = metallic, roughness)
+        // freely: vec2 mr = texture(...).bg; metallic = mr.x (B), roughness = mr.y (G)
+        // so we want B=0, G=255. ABGR: A=255, B=0, G=255, R=0 -> 0xFF00FF00
+        u32 defaultMRPixel = 0xFF00FF00; 
+
+        m_defaultAlbedo.LoadFromMemory(m_context, m_allocator, &whitePixel, 1, 1, VK_FORMAT_R8G8B8A8_UNORM);
+        m_defaultNormal.LoadFromMemory(m_context, m_allocator, &flatNormal, 1, 1, VK_FORMAT_R8G8B8A8_UNORM);
+        m_defaultMR.LoadFromMemory(m_context, m_allocator, &defaultMRPixel, 1, 1, VK_FORMAT_R8G8B8A8_UNORM);
+        m_defaultAO.LoadFromMemory(m_context, m_allocator, &whitePixel, 1, 1, VK_FORMAT_R8G8B8A8_UNORM);
+        m_defaultEmissive.LoadFromMemory(m_context, m_allocator, &blackPixel, 1, 1, VK_FORMAT_R8G8B8A8_UNORM);
+
+        if (!m_projectTexturePath.empty())
         {
-            m_testSpriteMaterial.Initialize(m_context, m_descriptorPool, m_materialLayout, m_testTexture);
+            if (!m_testTexture.LoadFromCookedFile(m_context, m_allocator,
+                                                  m_projectTexturePath,
+                                                  m_projectTexturePixelPerfect))
+                return false;
+            if (!m_testSpriteMaterial.Initialize(m_context, m_descriptorPool, m_materialLayout, m_testTexture, m_defaultNormal, m_defaultMR, m_defaultAO, m_defaultEmissive))
+                return false;
+            m_projectMaterial = &m_testSpriteMaterial;
         }
+        // The engine renderer does not load assets from any sample game.
+        // A project owns its texture/material/mesh bindings and may inject them
+        // through its renderer integration layer.
 
-        // Pass Init
-        m_spritePass.Initialize(m_context, m_renderPass.Handle(), m_globalUBOLayout, m_materialLayout);
-        m_meshPass.Initialize(m_context, m_renderPass.Handle(), m_globalUBOLayout, m_materialLayout);
-
+        // Initialize ImGuiLayer first so that ImGui Vulkan backend is fully initialized
         if (!m_imguiLayer.Initialize(m_context, m_swapchain, m_renderPass.Handle(), m_window.Handle()))
             return false;
 
-        // GameUILayer shares the ImGui context - must init AFTER ImGuiLayer.
-        m_gameUILayer.Initialize();
+        // Initialize Offscreen Viewport Target (safely registers ImGui descriptor now)
+        if (!m_offscreenTarget.Initialize(m_context, m_width, m_height))
+        {
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: offscreen target init failed");
+            return false;
+        }
+
+        // Pass Init using Offscreen RenderPass
+        m_spritePass.Initialize(m_context, m_offscreenTarget.Handle(), m_globalUBOLayout, m_materialLayout);
+        m_meshPass.Initialize(m_context, m_offscreenTarget.Handle(), m_globalUBOLayout, m_materialLayout);
+        m_raycastPass.Initialize(m_context, m_offscreenTarget.Handle(), m_globalUBOLayout, m_materialLayout);
+        m_skinnedMeshPass.Initialize(m_context, m_offscreenTarget.Handle(), m_globalUBOLayout, m_materialLayout);
+        m_csmPass.Initialize(m_context);
 
         // Load input bindings from config. Fallback to engine defaults on failure.
-        InputManager::Get().LoadBindings("source/engine/asset/input.ini");
+        InputManager::Get().LoadBindings(FileSystem::GetEngineAssetDir() + "/input.ini");
         InputManager::Get().OpenGamepads();
 
         return true;
@@ -179,10 +193,14 @@ namespace dt
 
             m_spritePass.Shutdown(m_context);
             m_meshPass.Shutdown(m_context);
+            m_raycastPass.Shutdown(m_context);
+            m_skinnedMeshPass.Shutdown(m_context);
+            m_csmPass.Shutdown(m_context);
+            m_playerMesh.Shutdown(m_context, m_allocator);
             m_testTexture.Shutdown(m_context, m_allocator);
 
+            m_offscreenTarget.Shutdown(m_context);
             m_imguiLayer.Shutdown(m_context);
-            m_gameUILayer.Shutdown();
             InputManager::Get().CloseGamepads();
             m_sync.Shutdown(m_context);
             m_commandPool.Shutdown(m_context);
@@ -192,6 +210,11 @@ namespace dt
             vkDestroyDescriptorSetLayout(m_context.Device(), m_materialLayout, nullptr);
             vkDestroyDescriptorSetLayout(m_context.Device(), m_globalUBOLayout, nullptr);
             m_globalUBO.Shutdown(m_context);
+        m_defaultAlbedo.Shutdown(m_context, m_allocator);
+        m_defaultNormal.Shutdown(m_context, m_allocator);
+        m_defaultMR.Shutdown(m_context, m_allocator);
+        m_defaultAO.Shutdown(m_context, m_allocator);
+        m_defaultEmissive.Shutdown(m_context, m_allocator);
             m_descriptorPool.Shutdown(m_context);
             m_allocator.Shutdown(&m_context);
 
@@ -207,45 +230,23 @@ namespace dt
         m_window.Shutdown();
     }
 
-    void VulkanRenderer::Render(const SimSnapshot& snapshot)
+    bool VulkanRenderer::Render(const SimSnapshot& snapshot)
     {
+        if (m_pendingOffscreenResize)
+        {
+            m_pendingOffscreenResize = false;
+            m_offscreenTarget.Resize(m_context, m_pendingOffscreenWidth, m_pendingOffscreenHeight);
+        }
+
         VkDevice device = m_context.Device();
 
         // 1. Process OS window/keyboard events on the render thread
+        InputManager::Get().BeginFrame();
         bool resized = false;
         u32 newWidth = 0;
         u32 newHeight = 0;
-        if (!m_window.PollEvents(resized, newWidth, newHeight))
-        {
-            if (m_app != nullptr)
-            {
-                m_app->RequestShutdown();
-            }
-            return;
-        }
+        if (!m_window.PollEvents(resized, newWidth, newHeight)) { return false; }
 
-        // Process all pending SDL events - keyboard, gamepad, window, touch.
-        // InputManager::BeginFrame clears "just pressed" flags before we feed events.
-        InputManager::Get().BeginFrame();
-        SDL_Event ev;
-        while (SDL_PollEvent(&ev))
-        {
-            // Let ImGui see every event first (for text fields, mouse in debug UI).
-            ImGui_ImplSDL3_ProcessEvent(&ev);
-
-            if (ev.type == SDL_EVENT_QUIT)
-            {
-                if (m_app != nullptr)
-                    m_app->RequestShutdown();
-                return;
-            }
-
-            if (m_app != nullptr)
-            {
-                if (!m_inputMapper.ProcessEvent(ev, *m_app))
-                    return;
-            }
-        }
         InputManager::Get().EndFrame();
 
         if (resized || m_resized)
@@ -254,7 +255,7 @@ namespace dt
             m_width   = newWidth;
             m_height  = newHeight;
             RecreateSwapchain();
-            return;
+            return true;
         }
 
         // 2. CPU-GPU Frame synchronization
@@ -270,12 +271,12 @@ namespace dt
         if (result == VK_ERROR_OUT_OF_DATE_KHR)
         {
             RecreateSwapchain();
-            return;
+            return true;
         }
         else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: failed to acquire swapchain image");
-            return;
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: failed to acquire swapchain image");
+            return true;
         }
 
         // Reset the fence only if we are successfully submitting work
@@ -289,38 +290,97 @@ namespace dt
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         vkBeginCommandBuffer(cmd, &beginInfo);
 
-        // Begin render pass with dark premium background color (0.08, 0.09, 0.12)
-        VkRenderPassBeginInfo renderPassInfo{};
-        renderPassInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass        = m_renderPass.Handle();
-        renderPassInfo.framebuffer       = m_swapchain.Framebuffer(imageIndex);
-        renderPassInfo.renderArea.offset = { 0, 0 };
-        renderPassInfo.renderArea.extent = m_swapchain.Extent();
+        renderer::GlobalUniforms globals{};
+        if (m_useCustomCamera)
+        {
+            globals.viewMatrix = m_customView;
+            globals.projectionMatrix = m_customProj;
+            globals.viewProjectionMatrix = globals.projectionMatrix * globals.viewMatrix;
+            globals.cameraPosition = Vec4(m_customCameraPos, 1.0f);
+        }
+        else
+        {
+            m_camera.Update();
+            globals.viewMatrix = m_camera.GetViewMatrix();
+            globals.projectionMatrix = m_camera.GetProjectionMatrix();
+            globals.viewProjectionMatrix = globals.projectionMatrix * globals.viewMatrix;
+            globals.cameraPosition = Vec4(m_camera.GetPosition(), 1.0f);
+        }
+        globals.lightDirection = Vec4(-0.35f, -1.0f, -0.25f, 0.0f);
+        globals.lightColor = Vec4(1.0f, 0.92f, 0.78f, 1.35f);
+        globals.ambientColor = Vec4(0.16f, 0.18f, 0.24f, 1.0f);
+        m_globalUBO.CopyData(m_context, &globals, sizeof(globals));
 
-        VkClearValue clearColor = { { { 0.08f, 0.09f, 0.12f, 1.0f } } };
-        renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues    = &clearColor;
+        m_meshProxies.clear();
+        for (const auto& proxy : snapshot.proxies)
+        {
+            if (proxy.visualId == StringID("hero"))
+                m_meshProxies.push_back(proxy);
+        }
 
-        vkCmdBeginRenderPass(cmd, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        // --- Pass 1: 3D Scene rendered to Offscreen Target ---
+        if (m_offscreenTarget.IsInitialized())
+        {
+            VkRenderPassBeginInfo offscreenPassInfo{};
+            offscreenPassInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            offscreenPassInfo.renderPass        = m_offscreenTarget.Handle();
+            offscreenPassInfo.framebuffer       = m_offscreenTarget.Framebuffer();
+            offscreenPassInfo.renderArea.offset = { 0, 0 };
+            offscreenPassInfo.renderArea.extent = m_offscreenTarget.Extent();
 
-        // Draw agents
-        m_spritePass.SetupFrame(m_swapchain.Extent(), m_globalUBOSet, &m_testSpriteMaterial, &snapshot.proxies);
-        m_spritePass.Execute(cmd);
+            VkClearValue offscreenClearValues[2]{};
+            offscreenClearValues[0].color = { { 0.10f, 0.11f, 0.14f, 1.0f } };
+            offscreenClearValues[1].depthStencil = { 1.0f, 0 };
+            offscreenPassInfo.clearValueCount = 2;
+            offscreenPassInfo.pClearValues    = offscreenClearValues;
 
-        // Draw HUD overlay - Game HUD first, then engine Debug HUD on top
+            vkCmdBeginRenderPass(cmd, &offscreenPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+            m_spritePass.SetupFrame(m_offscreenTarget.Extent(), m_globalUBOSet,
+                                    (m_projectMaterial ? m_projectMaterial : &m_testSpriteMaterial),
+                                    &snapshot.proxies);
+            m_spritePass.Execute(cmd);
+
+            if (!snapshot.raycastColumns.empty())
+            {
+                m_raycastPass.SetupFrame(m_offscreenTarget.Extent(), m_globalUBOSet,
+                                         (m_projectMaterial ? m_projectMaterial : &m_testSpriteMaterial),
+                                         &snapshot.raycastColumns);
+                m_raycastPass.Execute(cmd);
+            }
+
+            m_meshPass.SetupFrame(m_offscreenTarget.Extent(), m_globalUBOSet,
+                                  &m_testSpriteMaterial, &m_playerMesh, &m_meshProxies);
+            m_meshPass.Execute(cmd);
+
+            vkCmdEndRenderPass(cmd);
+        }
+
+        // --- Pass 2: ImGui UI & Viewport Image rendered to Swapchain ---
+        VkRenderPassBeginInfo swapchainPassInfo{};
+        swapchainPassInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        swapchainPassInfo.renderPass        = m_renderPass.Handle();
+        swapchainPassInfo.framebuffer       = m_swapchain.Framebuffer(imageIndex);
+        swapchainPassInfo.renderArea.offset = { 0, 0 };
+        swapchainPassInfo.renderArea.extent = m_swapchain.Extent();
+
+        VkClearValue clearValues[2]{};
+        clearValues[0].color = { { 0.08f, 0.09f, 0.12f, 1.0f } };
+        clearValues[1].depthStencil = { 1.0f, 0 };
+        swapchainPassInfo.clearValueCount = 2;
+        swapchainPassInfo.pClearValues    = clearValues;
+
+        vkCmdBeginRenderPass(cmd, &swapchainPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
         if (m_imguiLayer.IsInitialized())
         {
             m_imguiLayer.BeginFrame();
+            if (m_editorConstructCallback)
+            {
+                m_editorConstructCallback();
+            }
 
-            // Game HUD (day/time, needs bars, entity selector)
-            m_gameUILayer.DrawGameHUD(snapshot, m_width, m_height);
-
-            // Engine Debug HUD (simulation inspector, profiler, speed controls)
-            float tps = 0.0f;
-            if (m_app != nullptr)
-                tps = m_app->Sim().MeasuredTicksPerSecond();
-
-            m_imguiLayer.DrawHUD(snapshot, tps);
+            ImGui::Render();
             m_imguiLayer.Render(cmd);
         }
 
@@ -340,14 +400,14 @@ namespace dt
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers    = &cmd;
 
-        VkSemaphore signalSemaphores[] = { m_sync.RenderFinishedSemaphore(m_currentFrameIndex) };
+        VkSemaphore signalSemaphores[] = { m_sync.RenderFinishedSemaphore(imageIndex) };
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores    = signalSemaphores;
 
         if (vkQueueSubmit(m_context.GraphicsQueue(), 1, &submitInfo, inFlightFence) != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: failed to submit draw commands to queue");
-            return;
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: failed to submit draw commands to queue");
+            return true;
         }
 
         // 6. Present render results to screen
@@ -369,10 +429,21 @@ namespace dt
         }
         else if (result != VK_SUCCESS)
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: swapchain present failed");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: swapchain present failed");
         }
 
-        m_currentFrameIndex = (m_currentFrameIndex + 1) % kMaxFramesInFlight;
+                m_currentFrameIndex = (m_currentFrameIndex + 1) % kMaxFramesInFlight;
+
+        if (m_imguiLayer.IsInitialized())
+        {
+            ImGuiIO& io = ImGui::GetIO();
+            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+            {
+                ImGui::UpdatePlatformWindows();
+                ImGui::RenderPlatformWindowsDefault();
+            }
+        }
+        return true;
     }
 
     void VulkanRenderer::RecreateSwapchain()
@@ -396,7 +467,7 @@ namespace dt
 
         if (!m_swapchain.Recreate(m_context, m_surface, m_renderPass.Handle(), m_width, m_height))
         {
-            DT_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: failed to recreate swapchain");
+            LACRIMA_LOG_ERROR(LogCategory::Renderer, "VulkanRenderer: failed to recreate swapchain");
             return;
         }
 
@@ -406,3 +477,18 @@ namespace dt
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

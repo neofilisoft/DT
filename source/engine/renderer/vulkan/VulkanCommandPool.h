@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -21,7 +22,7 @@
 //   individual command buffers before recording each frame.
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
 
@@ -49,3 +50,4 @@ namespace dt::renderer
         std::vector<VkCommandBuffer> m_buffers;
     };
 }
+

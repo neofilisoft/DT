@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -20,7 +21,7 @@
 // (which we use for the agent quad shaders to avoid file path issues at runtime).
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
 
@@ -56,3 +57,4 @@ namespace dt::renderer
         VkShaderStageFlagBits m_stage = VK_SHADER_STAGE_VERTEX_BIT;
     };
 }
+

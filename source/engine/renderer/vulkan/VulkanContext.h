@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -21,7 +22,7 @@
 //
 // Validation layers: enabled in Debug and RelWithDebInfo builds (where
 //   DT_SHIPPING is not defined). The debug messenger callback routes all
-//   Vulkan validation messages through DT_LOG_* so they appear in the
+//   Vulkan validation messages through LACRIMA_LOG_* so they appear in the
 //   engine's standard log output rather than a separate Vulkan log.
 //
 // Physical device selection: picks the first discrete GPU, falling back to
@@ -34,7 +35,7 @@
 //   without explicit synchronization (which VulkanSync.h provides).
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext
     {
@@ -47,7 +48,6 @@ namespace dt::renderer
         {
             std::vector<const char*> instanceExtensions;
             std::vector<const char*> deviceExtensions;
-            VkSurfaceKHR             surface = VK_NULL_HANDLE; // used for queue family selection
             bool                     enableValidation = false;
         };
 
@@ -62,9 +62,12 @@ namespace dt::renderer
         VulkanContext(VulkanContext&&)                 = delete;
         VulkanContext& operator=(VulkanContext&&)      = delete;
 
-        // Returns false and logs a detailed error if initialization fails.
-        // All other methods are undefined to call if Initialize() returned false.
-        bool Initialize(const CreateInfo& ci);
+        // Phase 1: Create Instance and Setup Debug Messenger
+        bool InitializeInstance(const CreateInfo& ci);
+        
+        // Phase 2: Select Physical Device using Surface and Create Logical Device
+        bool InitializeDevice(VkSurfaceKHR surface, const std::vector<const char*>& deviceExtensions);
+
         void Shutdown();
 
         // --- Accessors (render-thread only) --------------------------------
@@ -80,11 +83,15 @@ namespace dt::renderer
         u32              GraphicsQueueFamilyIndex() const { return m_graphicsQueueFamily; }
         u32              PresentQueueFamilyIndex()  const { return m_presentQueueFamily; }
 
-        // Returns the memory type index that satisfies all bits in
-        // `typeFilter` and has all `properties` flags set.
-        // Asserts if no matching type is found (programming error: caller
-        // must request a type that the physical device actually provides).
         u32 FindMemoryType(u32 typeFilter, VkMemoryPropertyFlags properties) const;
+
+        // Finds the first format in the candidate list that supports the requested tiling and features.
+        // Returns VK_FORMAT_UNDEFINED if no supported format is found.
+        VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) const;
+
+        // Returns a supported depth format (e.g. D32_SFLOAT, D32_SFLOAT_S8_UINT, D24_UNORM_S8_UINT).
+        // Asserts if none are found.
+        VkFormat FindDepthFormat() const;
 
         // Helpers for one-shot command recording (used during resource
         // creation, e.g. buffer uploads). Allocates from the transfer
@@ -119,3 +126,5 @@ namespace dt::renderer
         bool m_validationEnabled = false;
     };
 }
+
+

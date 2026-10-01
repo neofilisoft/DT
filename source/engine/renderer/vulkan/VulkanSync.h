@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -21,7 +22,7 @@
 //      on the GPU. CPU waits on this before starting to record the next frame.
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class VulkanContext;
 
@@ -51,3 +52,4 @@ namespace dt::renderer
         std::vector<VkFence>     m_inFlightFences;
     };
 }
+
