@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "renderer/ui/GameUILayer.h"
 
 #include "core/logging/Logger.h"
@@ -7,7 +8,7 @@
 #include <cmath>
 #include <cstdio>
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     // -------------------------------------------------------------------------
     // Game UI color palette - premium dark theme, separate from ImGui defaults
@@ -39,13 +40,13 @@ namespace dt::renderer
         // We only validate the context is live, not create a new one.
         if (!ImGui::GetCurrentContext())
         {
-            DT_LOG_ERROR(LogCategory::Renderer,
+            LACRIMA_LOG_ERROR(LogCategory::Renderer,
                 "GameUILayer: ImGui context not yet initialized. "
                 "Call ImGuiLayer::Initialize() first.");
             return;
         }
         m_initialized = true;
-        DT_LOG_INFO(LogCategory::Renderer, "GameUILayer: initialized");
+        LACRIMA_LOG_INFO(LogCategory::Renderer, "GameUILayer: initialized");
     }
 
     void GameUILayer::Shutdown()
@@ -247,3 +248,5 @@ namespace dt::renderer
         ImGui::End();
     }
 }
+
+

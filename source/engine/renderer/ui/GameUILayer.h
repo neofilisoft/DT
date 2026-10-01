@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -27,7 +28,7 @@
 // live in screen-space regardless of the scene projection mode.
 // ---------------------------------------------------------------------------
 
-namespace dt::renderer
+namespace lacrima::renderer
 {
     class GameUILayer
     {
@@ -66,3 +67,4 @@ namespace dt::renderer
         int  m_selectedIdx  = 0;       // Which entity the player has selected (index into snapshot.proxies)
     };
 }
+
