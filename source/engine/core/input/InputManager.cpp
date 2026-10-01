@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/input/InputManager.h"
 #include "core/config/Config.h"
 #include "core/logging/Logger.h"
@@ -6,7 +7,7 @@
 #include <cctype>
 #include <unordered_map>
 
-namespace dt
+namespace lacrima
 {
     // -------------------------------------------------------------------------
     // String helpers
@@ -41,7 +42,7 @@ namespace dt
         ConfigLayer layer;
         if (!layer.LoadFromFile(iniPath))
         {
-            DT_LOG_WARN(LogCategory::Core,
+            LACRIMA_LOG_WARN(LogCategory::Core,
                 "InputManager: could not load bindings from '{}', using engine defaults", iniPath);
             // Register essential built-in fallbacks so the engine stays usable.
             RegisterAction({ "Pause",    { { InputDeviceType::Keyboard, InputBindingKind::Digital, SDLK_ESCAPE } } });
@@ -60,7 +61,7 @@ namespace dt
             SDL_Keycode kc = ParseKeycode(*strVal);
             if (kc == SDLK_UNKNOWN)
             {
-                DT_LOG_WARN(LogCategory::Core,
+                LACRIMA_LOG_WARN(LogCategory::Core,
                     "InputManager: unknown key name '{}' for action '{}'", *strVal, key);
                 continue;
             }
@@ -86,7 +87,7 @@ namespace dt
             SDL_GamepadButton btn = ParseGamepadButton(*strVal);
             if (btn == SDL_GAMEPAD_BUTTON_INVALID)
             {
-                DT_LOG_WARN(LogCategory::Core,
+                LACRIMA_LOG_WARN(LogCategory::Core,
                     "InputManager: unknown gamepad button '{}' for action '{}'", *strVal, key);
                 continue;
             }
@@ -112,7 +113,7 @@ namespace dt
             SDL_GamepadAxis axis = ParseGamepadAxis(*strVal);
             if (axis == SDL_GAMEPAD_AXIS_INVALID)
             {
-                DT_LOG_WARN(LogCategory::Core,
+                LACRIMA_LOG_WARN(LogCategory::Core,
                     "InputManager: unknown gamepad axis '{}' for action '{}'", *strVal, key);
                 continue;
             }
@@ -128,7 +129,7 @@ namespace dt
                 { InputDeviceType::Gamepad, InputBindingKind::Axis, static_cast<i32>(axis), 1.0f });
         }
 
-        DT_LOG_INFO(LogCategory::Core,
+        LACRIMA_LOG_INFO(LogCategory::Core,
             "InputManager: loaded {} actions from '{}'", m_actions.size(), iniPath);
     }
 
@@ -136,7 +137,7 @@ namespace dt
     {
         if (m_actions.size() >= kMaxActions)
         {
-            DT_LOG_WARN(LogCategory::Core,
+            LACRIMA_LOG_WARN(LogCategory::Core,
                 "InputManager: action limit reached, cannot register '{}'", def.name);
             return;
         }
@@ -239,7 +240,7 @@ namespace dt
                 if (pad)
                 {
                     m_gamepads.push_back(pad);
-                    DT_LOG_INFO(LogCategory::Core, "InputManager: gamepad connected ({})",
+                    LACRIMA_LOG_INFO(LogCategory::Core, "InputManager: gamepad connected ({})",
                         SDL_GetGamepadName(pad) ? SDL_GetGamepadName(pad) : "unknown");
                 }
                 break;
@@ -250,7 +251,7 @@ namespace dt
                 {
                     if (SDL_GetGamepadID(*it) == ev.gdevice.which)
                     {
-                        DT_LOG_INFO(LogCategory::Core, "InputManager: gamepad disconnected");
+                        LACRIMA_LOG_INFO(LogCategory::Core, "InputManager: gamepad disconnected");
                         SDL_CloseGamepad(*it);
                         m_gamepads.erase(it);
                         break;
@@ -297,7 +298,7 @@ namespace dt
                 if (pad)
                 {
                     m_gamepads.push_back(pad);
-                    DT_LOG_INFO(LogCategory::Core, "InputManager: opened gamepad '{}'",
+                    LACRIMA_LOG_INFO(LogCategory::Core, "InputManager: opened gamepad '{}'",
                         SDL_GetGamepadName(pad) ? SDL_GetGamepadName(pad) : "unknown");
                 }
             }
@@ -459,3 +460,5 @@ namespace dt
         return (it != kMap.end()) ? it->second : SDL_GAMEPAD_AXIS_INVALID;
     }
 }
+
+

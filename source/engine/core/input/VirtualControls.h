@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -32,7 +33,7 @@
 //   DPadRight= 0.20, 0.70, 0.08, 0.10
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     // One on-screen control region mapped to a named action.
     struct VirtualControlRegion
@@ -79,3 +80,4 @@ namespace dt
     // and SDL event processing.
     void ApplyVirtualControls(const VirtualControlLayout& layout);
 }
+

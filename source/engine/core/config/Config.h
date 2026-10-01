@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -35,7 +36,7 @@
 // errors like a mistyped JSON file produces).
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     using ConfigValue = std::variant<bool, i64, f64, std::string>;
 
@@ -97,3 +98,4 @@ namespace dt
         ConfigLayer m_userOverrides;
     };
 }
+

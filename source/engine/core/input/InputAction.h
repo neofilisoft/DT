@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -24,7 +25,7 @@
 //               across all device types)
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     enum class InputDeviceType : u8
     {
@@ -66,3 +67,4 @@ namespace dt
         bool                     isAxis = false; // true -> GetAxis(), false -> IsActionPressed()
     };
 }
+

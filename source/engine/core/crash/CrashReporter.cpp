@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/crash/CrashReporter.h"
 #include "core/logging/Logger.h"
 #include "core/platform/BuildConfig.h"
@@ -20,7 +21,7 @@
     #pragma comment(lib, "Dbghelp.lib")
 #endif
 
-namespace dt
+namespace lacrima
 {
     namespace
     {
@@ -230,7 +231,7 @@ namespace dt
             std::abort();
         });
 
-        DT_LOG_INFO(LogCategory::Core, "CrashReporter installed, dumping to '{}'", crashDumpDirectory);
+        LACRIMA_LOG_INFO(LogCategory::Core, "CrashReporter installed, dumping to '{}'", crashDumpDirectory);
     }
 
 #elif defined(DT_PLATFORM_WINDOWS)
@@ -276,7 +277,7 @@ namespace dt
             std::abort();
         });
 
-        DT_LOG_INFO(LogCategory::Core, "CrashReporter installed, dumping to '{}'", crashDumpDirectory);
+        LACRIMA_LOG_INFO(LogCategory::Core, "CrashReporter installed, dumping to '{}'", crashDumpDirectory);
     }
 
 #endif
@@ -292,3 +293,5 @@ namespace dt
         WriteReport(report);
     }
 }
+
+

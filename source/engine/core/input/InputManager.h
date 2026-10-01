@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/input/InputAction.h"
@@ -37,7 +38,7 @@
 //   float moveX = InputManager::Get().GetAxis("MoveX");
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     // Maximum number of named actions supported. Sized to keep state arrays
     // small enough to fit in a cache line or two, while being large enough for
@@ -157,3 +158,4 @@ namespace dt
         std::array<TouchPoint, kMaxTouchPoints> m_touchPoints = {};
     };
 }
+

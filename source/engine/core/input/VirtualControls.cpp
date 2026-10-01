@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/input/VirtualControls.h"
 #include "core/input/InputManager.h"
 #include "core/config/Config.h"
@@ -5,7 +6,7 @@
 
 #include <sstream>
 
-namespace dt
+namespace lacrima
 {
     VirtualControlLayout LoadVirtualControlLayout(const std::string& iniPath)
     {
@@ -39,12 +40,12 @@ namespace dt
             }
             else
             {
-                DT_LOG_WARN(LogCategory::Core,
+                LACRIMA_LOG_WARN(LogCategory::Core,
                     "VirtualControls: bad format for action '{}': '{}'", actionName, *strVal);
             }
         }
 
-        DT_LOG_INFO(LogCategory::Core,
+        LACRIMA_LOG_INFO(LogCategory::Core,
             "VirtualControls: loaded {} regions from '{}'", layout.regions.size(), iniPath);
         return layout;
     }
@@ -101,3 +102,5 @@ namespace dt
         }
     }
 }
+
+

@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Assert.h"
@@ -67,7 +68,7 @@
 // the opposite end).
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     class TaskGraph;
 
@@ -90,7 +91,7 @@ namespace dt
         explicit WorkStealingDeque(usize capacity = 1024)
             : m_buffer(capacity)
         {
-            DT_ASSERT((capacity & (capacity - 1)) == 0, "WorkStealingDeque capacity must be a power of two");
+            LACRIMA_ASSERT((capacity & (capacity - 1)) == 0, "WorkStealingDeque capacity must be a power of two");
         }
 
         // Owner-thread only.
@@ -101,6 +102,7 @@ namespace dt
 
             if (b - t >= static_cast<i64>(m_buffer.size()))
             {
+                // H5 fix: call Grow() which will assert - see Grow() comment.
                 Grow();
             }
 
@@ -161,21 +163,23 @@ namespace dt
 
         void Grow()
         {
-            // Growth is intentionally rare (sized generously up front per
-            // worker based on expected max simultaneously-pending tasks per
-            // tick) and is not lock-free - it only ever happens from the
-            // owner thread inside Push, and thieves reading mid-grow simply
-            // retry (their CAS on m_top will fail against the old size or
-            // succeed against consistent data, since we only ever append
-            // capacity, never relocate indices below the current top).
-            std::vector<TaskFunc*> grown(m_buffer.size() * 2);
-            const i64 b = m_bottom.load(std::memory_order_relaxed);
-            const i64 t = m_top.load(std::memory_order_relaxed);
-            for (i64 i = t; i < b; ++i)
-            {
-                grown[i & (grown.size() - 1)] = m_buffer[i & Mask()];
-            }
-            m_buffer.swap(grown);
+            // H5 fix: The original Grow() used std::vector::swap which is not safe
+            // against concurrent thieves reading m_buffer.size() or element pointers
+            // during the swap/reallocation. This is a data race on the vector object
+            // itself, not just on the element slots.
+            //
+            // Correct Chase-Lev dynamic growth requires publishing a new immutable
+            // buffer via an atomic pointer and deferring reclamation (hazard pointers
+            // or epoch-based reclamation). That is a significant implementation.
+            //
+            // For Lacrima's fixed simulation tick graph the 1024 default is always
+            // sufficient. We now treat overflow as a hard contract violation rather
+            // than silently introducing a data race. Callers that truly need larger
+            // graphs should increase the initial capacity passed to the constructor.
+            LACRIMA_ASSERT(false,
+                "WorkStealingDeque: capacity overflow - increase initial capacity. "
+                "Dynamic growth is disabled because std::vector::swap is not safe "
+                "against concurrent thieves (H5 fix).");
         }
 
         std::vector<TaskFunc*> m_buffer;
@@ -322,12 +326,18 @@ namespace dt
         void ExecuteNode(TaskGraph::Node* node);
 
         std::vector<std::unique_ptr<Worker>> m_workers;
-        std::atomic<bool> m_running{ false };
-        std::atomic<u32> m_activeGraphPendingCount{ 0 };
+        
+        std::mutex m_externalMutex;
+        std::vector<TaskFunc*> m_externalTasks;
 
         std::mutex m_wakeMutex;
         std::condition_variable m_wakeCv;
+        std::atomic<bool> m_running{ false };
+        std::atomic<u32> m_activeGraphPendingCount{ 0 };
 
         static thread_local u32 s_currentWorkerIndex;
     };
 }
+
+
+

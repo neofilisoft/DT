@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/filesystem/FileSystem.h"
 #include "core/logging/Logger.h"
 #include "core/platform/Assert.h"
@@ -7,9 +8,16 @@
 #include <filesystem>
 #include <fstream>
 
+#if defined(LACRIMA_PLATFORM_WINDOWS)
+#    define WIN32_LEAN_AND_MEAN
+#    include <windows.h>
+#elif defined(__linux__)
+#    include <unistd.h>
+#endif
+
 namespace fs = std::filesystem;
 
-namespace dt
+namespace lacrima
 {
     struct FileHandle::Impl
     {
@@ -41,14 +49,14 @@ namespace dt
 
     usize FileHandle::Read(void* dest, usize sizeBytes)
     {
-        DT_ASSERT(IsOpen(), "FileHandle::Read called on unopened file");
+        LACRIMA_ASSERT(IsOpen(), "FileHandle::Read called on unopened file");
         m_impl->stream.read(static_cast<char*>(dest), static_cast<std::streamsize>(sizeBytes));
         return static_cast<usize>(m_impl->stream.gcount());
     }
 
     usize FileHandle::Write(const void* data, usize sizeBytes)
     {
-        DT_ASSERT(IsOpen(), "FileHandle::Write called on unopened file");
+        LACRIMA_ASSERT(IsOpen(), "FileHandle::Write called on unopened file");
         const auto posBefore = m_impl->stream.tellp();
         m_impl->stream.write(static_cast<const char*>(data), static_cast<std::streamsize>(sizeBytes));
         const auto posAfter = m_impl->stream.tellp();
@@ -57,20 +65,20 @@ namespace dt
 
     void FileHandle::Seek(usize offset)
     {
-        DT_ASSERT(IsOpen(), "FileHandle::Seek called on unopened file");
+        LACRIMA_ASSERT(IsOpen(), "FileHandle::Seek called on unopened file");
         m_impl->stream.seekg(static_cast<std::streamoff>(offset));
         m_impl->stream.seekp(static_cast<std::streamoff>(offset));
     }
 
     usize FileHandle::Tell() const
     {
-        DT_ASSERT(IsOpen(), "FileHandle::Tell called on unopened file");
+        LACRIMA_ASSERT(IsOpen(), "FileHandle::Tell called on unopened file");
         return static_cast<usize>(m_impl->stream.tellg());
     }
 
     usize FileHandle::Size() const
     {
-        DT_ASSERT(IsOpen(), "FileHandle::Size called on unopened file");
+        LACRIMA_ASSERT(IsOpen(), "FileHandle::Size called on unopened file");
         std::error_code ec;
         const auto size = fs::file_size(m_impl->path, ec);
         return ec ? 0 : static_cast<usize>(size);
@@ -153,7 +161,7 @@ namespace dt
 
         if (!impl->stream.is_open())
         {
-            DT_LOG_WARN(LogCategory::FileSystem, "Failed to open file: {}", resolved);
+            LACRIMA_LOG_WARN(LogCategory::FileSystem, "Failed to open file: {}", resolved);
             delete impl;
             return std::nullopt;
         }
@@ -206,7 +214,7 @@ namespace dt
         fs::create_directories(ResolvePath(path), ec);
         if (ec)
         {
-            DT_LOG_ERROR(LogCategory::FileSystem, "CreateDirectoryRecursive failed for '{}': {}", path, ec.message());
+            LACRIMA_LOG_ERROR(LogCategory::FileSystem, "CreateDirectoryRecursive failed for '{}': {}", path, ec.message());
             return false;
         }
         return true;
@@ -280,12 +288,54 @@ namespace dt
         std::ofstream stream(resolved, std::ios::binary | std::ios::trunc);
         if (!stream.is_open())
         {
-            DT_LOG_ERROR(LogCategory::FileSystem, "WriteEntireFile failed to open '{}'", resolved);
+            LACRIMA_LOG_ERROR(LogCategory::FileSystem, "WriteEntireFile failed to open '{}'", resolved);
             return false;
         }
 
         stream.write(static_cast<const char*>(data), static_cast<std::streamsize>(sizeBytes));
         return stream.good();
+    }
+
+    bool FileSystem::WriteEntireFileAtomic(const std::string& path, const void* data, usize sizeBytes) const
+    {
+        const std::string resolved = ResolvePath(path);
+        const fs::path destination(resolved);
+        const fs::path parent = destination.parent_path();
+        if (!parent.empty())
+        {
+            std::error_code ec;
+            fs::create_directories(parent, ec);
+            if (ec) return false;
+        }
+
+        const fs::path staging = destination.string() + ".dt-staging";
+        {
+            std::ofstream stream(staging, std::ios::binary | std::ios::trunc);
+            if (!stream.is_open()) return false;
+            stream.write(static_cast<const char*>(data), static_cast<std::streamsize>(sizeBytes));
+            if (!stream.good()) { std::error_code ignored; fs::remove(staging, ignored); return false; }
+        }
+
+        std::error_code ec;
+        fs::remove(destination, ec);
+        ec.clear();
+        fs::rename(staging, destination, ec);
+        if (ec)
+        {
+            std::error_code ignored;
+            fs::remove(staging, ignored);
+            LACRIMA_LOG_ERROR(LogCategory::FileSystem, "WriteEntireFileAtomic failed for '{}': {}", path, ec.message());
+            return false;
+        }
+        return true;
+    }
+    bool FileSystem::RemoveFile(const std::string& path) const
+    {
+        std::error_code ec;
+        const std::string resolved = ResolvePath(path);
+        if (!fs::exists(resolved, ec))
+            return true;
+        return fs::remove(resolved, ec) && !ec;
     }
 
     std::string FileSystem::GetExtension(const std::string& path)
@@ -301,5 +351,37 @@ namespace dt
     std::string FileSystem::GetParentDirectory(const std::string& path)
     {
         return NormalizeSeparators(fs::path(path).parent_path().string());
+    }
+
+    #ifdef _WIN32
+    #include <windows.h>
+    #endif
+
+    std::string FileSystem::GetExecutableDir()
+    {
+        #ifdef _WIN32
+        char path[MAX_PATH];
+        GetModuleFileNameA(NULL, path, MAX_PATH);
+        return FileSystem::GetParentDirectory(std::string(path));
+        #else
+        // Mock for now
+        return "";
+        #endif
+    }
+
+    std::string FileSystem::GetEngineAssetDir()
+    {
+        std::string exeDir = GetExecutableDir();
+        std::error_code ec;
+        if (!exeDir.empty())
+        {
+            if (fs::exists(exeDir + "/asset", ec) && fs::is_directory(exeDir + "/asset", ec))
+                return NormalizeSeparators(exeDir + "/asset");
+            if (fs::exists(exeDir + "/../source/engine/asset", ec) && fs::is_directory(exeDir + "/../source/engine/asset", ec))
+                return NormalizeSeparators(exeDir + "/../source/engine/asset");
+        }
+        if (fs::exists("source/engine/asset", ec) && fs::is_directory("source/engine/asset", ec))
+            return "source/engine/asset";
+        return exeDir + "/asset";
     }
 }

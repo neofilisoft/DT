@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -15,7 +16,7 @@
 // Categorized, leveled logging with pluggable sinks (console, file, and
 // later an in-editor log panel sink). Uses std::format (C++20) for
 // compile-time format-string checking rather than printf-style varargs -
-// a malformed DT_LOG_INFO("{}", ) call is a compile error, not a runtime
+// a malformed LACRIMA_LOG_INFO("{}", ) call is a compile error, not a runtime
 // crash or garbage output discovered during a play session.
 //
 // Threading: LogSink::Write is called from any thread (the job system runs
@@ -26,7 +27,7 @@
 // here than throughput.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     enum class LogLevel : u8
     {
@@ -134,31 +135,33 @@ namespace dt
 // is a compile error.
 // ---------------------------------------------------------------------------
 
-#define DT_LOG_TRACE(category, fmt, ...)                                                              \
+#define LACRIMA_LOG_TRACE(category, fmt, ...)                                                              \
     do {                                                                                               \
-        if (::dt::Logger::Get().GetMinLevel(category) <= ::dt::LogLevel::Trace)                       \
-            ::dt::Logger::Get().Log(::dt::LogLevel::Trace, category, std::format(fmt, ##__VA_ARGS__)); \
+        if (::lacrima::Logger::Get().GetMinLevel(category) <= ::lacrima::LogLevel::Trace)                       \
+            ::lacrima::Logger::Get().Log(::lacrima::LogLevel::Trace, category, std::format(fmt, ##__VA_ARGS__)); \
     } while (0)
 
-#define DT_LOG_INFO(category, fmt, ...)                                                               \
+#define LACRIMA_LOG_INFO(category, fmt, ...)                                                               \
     do {                                                                                               \
-        if (::dt::Logger::Get().GetMinLevel(category) <= ::dt::LogLevel::Info)                        \
-            ::dt::Logger::Get().Log(::dt::LogLevel::Info, category, std::format(fmt, ##__VA_ARGS__));  \
+        if (::lacrima::Logger::Get().GetMinLevel(category) <= ::lacrima::LogLevel::Info)                        \
+            ::lacrima::Logger::Get().Log(::lacrima::LogLevel::Info, category, std::format(fmt, ##__VA_ARGS__));  \
     } while (0)
 
-#define DT_LOG_WARN(category, fmt, ...)                                                                \
+#define LACRIMA_LOG_WARN(category, fmt, ...)                                                                \
     do {                                                                                                \
-        if (::dt::Logger::Get().GetMinLevel(category) <= ::dt::LogLevel::Warning)                     \
-            ::dt::Logger::Get().Log(::dt::LogLevel::Warning, category, std::format(fmt, ##__VA_ARGS__)); \
+        if (::lacrima::Logger::Get().GetMinLevel(category) <= ::lacrima::LogLevel::Warning)                     \
+            ::lacrima::Logger::Get().Log(::lacrima::LogLevel::Warning, category, std::format(fmt, ##__VA_ARGS__)); \
     } while (0)
 
-#define DT_LOG_ERROR(category, fmt, ...)                                                               \
+#define LACRIMA_LOG_ERROR(category, fmt, ...)                                                               \
     do {                                                                                                \
-        if (::dt::Logger::Get().GetMinLevel(category) <= ::dt::LogLevel::Error)                        \
-            ::dt::Logger::Get().Log(::dt::LogLevel::Error, category, std::format(fmt, ##__VA_ARGS__));  \
+        if (::lacrima::Logger::Get().GetMinLevel(category) <= ::lacrima::LogLevel::Error)                        \
+            ::lacrima::Logger::Get().Log(::lacrima::LogLevel::Error, category, std::format(fmt, ##__VA_ARGS__));  \
     } while (0)
 
-#define DT_LOG_FATAL(category, fmt, ...)                                                               \
+#define LACRIMA_LOG_FATAL(category, fmt, ...)                                                               \
     do {                                                                                                \
-        ::dt::Logger::Get().Log(::dt::LogLevel::Fatal, category, std::format(fmt, ##__VA_ARGS__));      \
+        ::lacrima::Logger::Get().Log(::lacrima::LogLevel::Fatal, category, std::format(fmt, ##__VA_ARGS__));      \
     } while (0)
+
+

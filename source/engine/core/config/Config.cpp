@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/config/Config.h"
 #include "core/filesystem/FileSystem.h"
 #include "core/logging/Logger.h"
@@ -6,7 +7,7 @@
 #include <cctype>
 #include <sstream>
 
-namespace dt
+namespace lacrima
 {
     namespace
     {
@@ -89,7 +90,7 @@ namespace dt
         auto contents = FileSystem::Get().ReadEntireFile(path);
         if (!contents.has_value())
         {
-            DT_LOG_WARN(LogCategory::Config, "ConfigLayer: could not read file '{}'", path);
+            LACRIMA_LOG_WARN(LogCategory::Config, "ConfigLayer: could not read file '{}'", path);
             return false;
         }
 
@@ -121,7 +122,7 @@ namespace dt
             const auto eqPos = trimmed.find('=');
             if (eqPos == std::string::npos)
             {
-                DT_LOG_WARN(LogCategory::Config, "ConfigLayer: malformed line (no '='): '{}'", trimmed);
+                LACRIMA_LOG_WARN(LogCategory::Config, "ConfigLayer: malformed line (no '='): '{}'", trimmed);
                 continue;
             }
 
@@ -197,7 +198,7 @@ namespace dt
     {
         if (!m_engineDefaults.LoadFromFile(path))
         {
-            DT_LOG_ERROR(LogCategory::Config, "Failed to load engine defaults from '{}'", path);
+            LACRIMA_LOG_ERROR(LogCategory::Config, "Failed to load engine defaults from '{}'", path);
         }
     }
 
@@ -205,7 +206,7 @@ namespace dt
     {
         if (!m_gameConfig.LoadFromFile(path))
         {
-            DT_LOG_WARN(LogCategory::Config, "No game config loaded from '{}' (using engine defaults only)", path);
+            LACRIMA_LOG_WARN(LogCategory::Config, "No game config loaded from '{}' (using engine defaults only)", path);
         }
     }
 
@@ -213,7 +214,7 @@ namespace dt
     {
         if (!m_userOverrides.LoadFromFile(path))
         {
-            DT_LOG_INFO(LogCategory::Config, "No user overrides found at '{}' (first run, using defaults)", path);
+            LACRIMA_LOG_INFO(LogCategory::Config, "No user overrides found at '{}' (first run, using defaults)", path);
         }
     }
 
@@ -286,3 +287,5 @@ namespace dt
         m_userOverrides.Set(section, key, std::move(value));
     }
 }
+
+

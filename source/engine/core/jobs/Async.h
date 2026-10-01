@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/jobs/JobSystem.h"
@@ -26,7 +27,7 @@
 // of wrapping a single Node in a throwaway one-node TaskGraph here.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     template <typename T>
     class Future
@@ -122,3 +123,4 @@ namespace dt
         return future;
     }
 }
+

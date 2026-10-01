@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/logging/Logger.h"
 
 #include <chrono>
@@ -5,7 +6,7 @@
 #include <fstream>
 #include <thread>
 
-namespace dt
+namespace lacrima
 {
     const char* ToString(LogLevel level)
     {
@@ -89,7 +90,11 @@ namespace dt
 #if defined(DT_PLATFORM_WINDOWS)
         localtime_s(&tmBuf, &nowTimeT);
 #else
+#if defined(_WIN32) || defined(_MSC_VER)
+        localtime_s(&tmBuf, &nowTimeT);
+#else
         localtime_r(&nowTimeT, &tmBuf);
+#endif
 #endif
         std::strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", &tmBuf);
 
@@ -162,3 +167,5 @@ namespace dt
         }
     }
 }
+
+

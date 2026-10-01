@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -12,7 +13,7 @@
 // Installs process-wide fault handlers (SIGSEGV/SIGABRT/SIGFPE/SIGILL on
 // Linux, vectored exception handler + std::set_terminate on Windows) that
 // write a crash report to disk before the process dies. This is separate
-// from Assert.h/DT_ASSERT: an assert is a caught, expected-to-be-caught
+// from Assert.h/LACRIMA_ASSERT: an assert is a caught, expected-to-be-caught
 // programming error with a controlled response (log + breakpoint in
 // Debug). CrashReporter exists for the *uncaught* case - a genuine
 // segfault, an unhandled C++ exception escaping main, a stack overflow -
@@ -45,7 +46,7 @@
 // (most synchronization primitives are not async-signal-safe).
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     struct CrashReport
     {
@@ -96,3 +97,5 @@ namespace dt
         static constexpr usize kMaxBreadcrumbs = 64;
     };
 }
+
+

@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Assert.h"
@@ -47,7 +48,7 @@
 // consistent for one loaded session from UUIDs stored in a save file.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     template <typename T>
     struct Handle
@@ -190,6 +191,45 @@ namespace dt
             }
         }
 
+        template <typename Writer>
+        void Serialize(Writer& writer) const
+        {
+            u32 cap = static_cast<u32>(m_slots.size());
+            writer.template WritePrimitive<u32>(cap);
+            if (cap == 0) return;
+
+            // Note: we only support serializing SlotMap where T is trivially copyable or empty (like EntityTag)
+            for (const T& slot : m_slots) { writer.template WritePrimitive<T>(slot); }
+            for (u32 gen : m_generations) { writer.template WritePrimitive<u32>(gen); }
+            for (bool alive : m_alive)    { writer.template WritePrimitive<u8>(alive ? 1 : 0); }
+            
+            writer.template WritePrimitive<u32>(static_cast<u32>(m_freeList.size()));
+            for (u32 f : m_freeList) { writer.template WritePrimitive<u32>(f); }
+        }
+
+        template <typename Reader>
+        bool Deserialize(Reader& reader)
+        {
+            if (reader.AtEnd()) return false;
+            u32 cap = reader.template ReadPrimitive<u32>();
+            
+            m_slots.resize(cap);
+            m_generations.resize(cap);
+            m_alive.resize(cap);
+            
+            if (cap > 0)
+            {
+                for (u32 i = 0; i < cap; ++i) { m_slots[i] = reader.template ReadPrimitive<T>(); }
+                for (u32 i = 0; i < cap; ++i) { m_generations[i] = reader.template ReadPrimitive<u32>(); }
+                for (u32 i = 0; i < cap; ++i) { m_alive[i] = (reader.template ReadPrimitive<u8>() != 0); }
+                
+                u32 freeCount = reader.template ReadPrimitive<u32>();
+                m_freeList.resize(freeCount);
+                for (u32 i = 0; i < freeCount; ++i) { m_freeList[i] = reader.template ReadPrimitive<u32>(); }
+            }
+            return true;
+        }
+
     private:
         std::vector<T> m_slots;
         std::vector<u32> m_generations;
@@ -197,3 +237,4 @@ namespace dt
         std::vector<u32> m_freeList;
     };
 }
+

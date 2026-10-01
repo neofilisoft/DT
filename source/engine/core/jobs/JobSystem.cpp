@@ -1,8 +1,9 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/jobs/JobSystem.h"
 #include "core/logging/Logger.h"
 #include "core/profiler/Profiler.h"
 
-namespace dt
+namespace lacrima
 {
     thread_local u32 JobSystem::s_currentWorkerIndex = JobSystem::kMainThreadIndex;
 
@@ -14,7 +15,7 @@ namespace dt
 
     void JobSystem::Initialize(u32 workerCountOverride)
     {
-        DT_ASSERT(!m_running.load(), "JobSystem::Initialize called twice without Shutdown");
+        LACRIMA_ASSERT(!m_running.load(), "JobSystem::Initialize called twice without Shutdown");
 
         const u32 hwThreads = std::thread::hardware_concurrency();
         // hardware_concurrency() - 1: the calling/main thread participates
@@ -27,7 +28,7 @@ namespace dt
         const u32 defaultWorkers = (hwThreads > 1) ? (hwThreads - 1) : 1;
         const u32 workerCount = (workerCountOverride > 0) ? workerCountOverride : defaultWorkers;
 
-        DT_LOG_INFO(LogCategory::Jobs, "JobSystem initializing with {} worker thread(s) (hardware_concurrency={})",
+        LACRIMA_LOG_INFO(LogCategory::Jobs, "JobSystem initializing with {} worker thread(s) (hardware_concurrency={})",
             workerCount, hwThreads);
 
         m_running.store(true, std::memory_order_release);
@@ -65,7 +66,17 @@ namespace dt
         }
         m_workers.clear();
 
-        DT_LOG_INFO(LogCategory::Jobs, "JobSystem shut down");
+        // Drain any tasks that were queued externally but never picked up.
+        // These are heap-allocated TaskFunc* that would leak if we just
+        // destroyed the queue without deleting them.
+        {
+            std::lock_guard<std::mutex> lock(m_externalMutex);
+            for (TaskFunc* task : m_externalTasks)
+                delete task;
+            m_externalTasks.clear();
+        }
+
+        LACRIMA_LOG_INFO(LogCategory::Jobs, "JobSystem shut down");
     }
 
     u32 JobSystem::CurrentWorkerIndex() const
@@ -108,17 +119,11 @@ namespace dt
                 }
                 else
                 {
-                    // Main thread found a ready successor while waiting on
-                    // RunGraph but is not itself a pool worker with a deque
-                    // (kMainThreadIndex has no Worker entry) - hand it to
                     // worker 0's deque instead so it still gets picked up by
                     // the stealing pool.
-                    if (!m_workers.empty())
-                    {
-                        TaskFunc* taskSlot = new TaskFunc([this, successor]() { ExecuteNode(successor); });
-                        m_workers[0]->deque.Push(taskSlot);
-                        m_wakeCv.notify_all();
-                    }
+                    std::lock_guard<std::mutex> lock(m_externalMutex);
+                    m_externalTasks.push_back(new TaskFunc([this, successor]() { ExecuteNode(successor); }));
+                    m_wakeCv.notify_all();
                 }
             }
         }
@@ -151,6 +156,23 @@ namespace dt
                 delete stolen;
                 return true;
             }
+        }
+
+        TaskFunc* externalTask = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(m_externalMutex);
+            if (!m_externalTasks.empty())
+            {
+                externalTask = m_externalTasks.back();
+                m_externalTasks.pop_back();
+            }
+        }
+
+        if (externalTask)
+        {
+            (*externalTask)();
+            delete externalTask;
+            return true;
         }
 
         return false;
@@ -191,12 +213,22 @@ namespace dt
             return;
         }
 
-        static std::atomic<u32> s_roundRobin{ 0 };
-        const u32 target = s_roundRobin.fetch_add(1, std::memory_order_relaxed) % static_cast<u32>(m_workers.size());
-
-        TaskFunc* taskSlot = new TaskFunc(std::move(func));
-        m_workers[target]->deque.Push(taskSlot);
-        m_wakeCv.notify_all();
+        const u32 caller = CurrentWorkerIndex();
+        if (caller != kMainThreadIndex && caller < m_workers.size())
+        {
+            TaskFunc* taskSlot = new TaskFunc(std::move(func));
+            m_workers[caller]->deque.Push(taskSlot);
+            m_wakeCv.notify_all();
+        }
+        else
+        {
+            TaskFunc* taskSlot = new TaskFunc(std::move(func));
+            {
+                std::lock_guard<std::mutex> lock(m_externalMutex);
+                m_externalTasks.push_back(taskSlot);
+            }
+            m_wakeCv.notify_all();
+        }
     }
 
     bool JobSystem::TryStealAndRunOne()
@@ -210,6 +242,24 @@ namespace dt
         // Calling thread is not a pool worker (true main thread): steal from
         // every worker deque directly since there is no "own deque" to pop
         // from first.
+        
+        TaskFunc* externalTask = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(m_externalMutex);
+            if (!m_externalTasks.empty())
+            {
+                externalTask = m_externalTasks.back();
+                m_externalTasks.pop_back();
+            }
+        }
+
+        if (externalTask)
+        {
+            (*externalTask)();
+            delete externalTask;
+            return true;
+        }
+
         for (auto& worker : m_workers)
         {
             if (TaskFunc* stolen = worker->deque.Steal())
@@ -235,9 +285,9 @@ namespace dt
             if (node->m_pendingDependencyCount.load(std::memory_order_relaxed) == 0)
             {
                 TaskFunc* taskSlot = new TaskFunc([this, ptr = node.get()]() { ExecuteNode(ptr); });
-                if (!m_workers.empty())
                 {
-                    m_workers[readyCount % m_workers.size()]->deque.Push(taskSlot);
+                    std::lock_guard<std::mutex> lock(m_externalMutex);
+                    m_externalTasks.push_back(taskSlot);
                 }
                 ++readyCount;
             }
@@ -257,13 +307,33 @@ namespace dt
         while (m_activeGraphPendingCount.load(std::memory_order_acquire) > 0)
         {
             bool didWork = false;
-            for (usize i = 0; i < m_workers.size() && !didWork; ++i)
+            
+            TaskFunc* externalTask = nullptr;
             {
-                if (TaskFunc* stolen = m_workers[i]->deque.Steal())
+                std::lock_guard<std::mutex> lock(m_externalMutex);
+                if (!m_externalTasks.empty())
                 {
-                    (*stolen)();
-                    delete stolen;
-                    didWork = true;
+                    externalTask = m_externalTasks.back();
+                    m_externalTasks.pop_back();
+                }
+            }
+
+            if (externalTask)
+            {
+                (*externalTask)();
+                delete externalTask;
+                didWork = true;
+            }
+            else
+            {
+                for (usize i = 0; i < m_workers.size() && !didWork; ++i)
+                {
+                    if (TaskFunc* stolen = m_workers[i]->deque.Steal())
+                    {
+                        (*stolen)();
+                        delete stolen;
+                        didWork = true;
+                    }
                 }
             }
 
@@ -276,3 +346,5 @@ namespace dt
         }
     }
 }
+
+

@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/handle/Handle.h"
@@ -35,7 +36,7 @@
 // because it exists.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     // Opaque tag type identifying "an entity" for the purposes of this
     // container - the concrete Entity type (Runtime module) is just
@@ -55,7 +56,7 @@ namespace dt
         template <typename... Args>
         T& Add(EntityHandleT entity, Args&&... args)
         {
-            DT_ASSERT(m_sparse.find(entity) == m_sparse.end(),
+            LACRIMA_ASSERT(m_sparse.find(entity) == m_sparse.end(),
                 "ComponentArray::Add called for an entity that already has this component");
 
             const usize denseIndex = m_dense.size();
@@ -155,9 +156,57 @@ namespace dt
             }
         }
 
+        template <typename Writer>
+        void Serialize(Writer& writer) const
+        {
+            writer.template WritePrimitive<u32>(static_cast<u32>(m_dense.size()));
+            for (usize i = 0; i < m_dense.size(); ++i)
+            {
+                writer.template WritePrimitive<EntityHandleT>(m_denseToEntity[i]);
+                if constexpr (requires { T::StaticTypeInfo(); })
+                {
+                    writer.WriteObject(&m_dense[i], T::StaticTypeInfo());
+                }
+                else
+                {
+                    writer.template WritePrimitive<T>(m_dense[i]);
+                }
+            }
+        }
+
+        template <typename Reader>
+        bool Deserialize(Reader& reader)
+        {
+            if (reader.AtEnd()) return false;
+            u32 count = reader.template ReadPrimitive<u32>();
+            
+            Clear();
+            Reserve(count);
+            
+            for (u32 i = 0; i < count; ++i)
+            {
+                EntityHandleT ent = reader.template ReadPrimitive<EntityHandleT>();
+                T& comp = Add(ent);
+                if constexpr (requires { T::StaticTypeInfo(); })
+                {
+                    if (!reader.ReadObject(&comp, T::StaticTypeInfo()))
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    comp = reader.template ReadPrimitive<T>();
+                }
+            }
+            return true;
+        }
+
     private:
         std::vector<T> m_dense;
         std::vector<EntityHandleT> m_denseToEntity;
         std::unordered_map<EntityHandleT, usize, typename EntityHandleT::Hasher> m_sparse;
     };
 }
+
+

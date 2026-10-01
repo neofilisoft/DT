@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -26,7 +27,7 @@
 // would fail to resolve its asset paths when loaded on Linux.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     enum class FileOpenMode : u8
     {
@@ -96,6 +97,9 @@ namespace dt
         // is needed in memory anyway (not a case for streamed reads).
         std::optional<std::vector<u8>> ReadEntireFile(const std::string& path) const;
         bool WriteEntireFile(const std::string& path, const void* data, usize sizeBytes) const;
+        // Writes to a staging file and replaces the destination after the write succeeds.
+        bool WriteEntireFileAtomic(const std::string& path, const void* data, usize sizeBytes) const;
+        bool RemoveFile(const std::string& path) const;
 
         std::string ResolvePath(const std::string& path) const;
 
@@ -104,7 +108,17 @@ namespace dt
         static std::string GetParentDirectory(const std::string& path);
         static std::string NormalizeSeparators(const std::string& path);
 
+        // Returns the directory containing the running executable.
+        // Used to resolve engine-relative paths without hardcoding working directory assumptions.
+        static std::string GetExecutableDir();
+
+        // Returns the engine asset directory (executable dir + "/asset").
+        // Use this instead of hardcoding "source/engine/asset".
+        static std::string GetEngineAssetDir();
+
     private:
         std::string m_contentRoot;
     };
 }
+
+
