@@ -1,12 +1,13 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/platform/Assert.h"
 
-namespace dt::detail
+namespace lacrima::detail
 {
     void ReportAssertFailure(const char* expr, const char* file, int line, const char* msg)
     {
         // Deliberately uses stderr + fprintf directly rather than the Logger
         // (core/logging). Logger initialization itself is guarded by
-        // DT_ASSERT in a few paths, and Logger's own formatting path could
+        // LACRIMA_ASSERT in a few paths, and Logger's own formatting path could
         // in principle be the thing that's broken when an assert fires. A
         // fault reporter must not depend on the subsystem it might be
         // reporting a fault in.
@@ -21,3 +22,5 @@ namespace dt::detail
         std::fflush(stderr);
     }
 }
+
+

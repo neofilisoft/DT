@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/BuildConfig.h"
@@ -7,6 +8,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "core/string/StringID.h"
 
 // ---------------------------------------------------------------------------
 // Reflection.h
@@ -44,7 +47,7 @@
 // user selects an object at runtime).
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     enum class FieldType : u8
     {
@@ -150,7 +153,7 @@ namespace dt
 //   {
 //       f32 hunger = 100.0f;
 //       f32 bladder = 100.0f;
-//       dt::Vec3 lastSatisfiedLocation;
+//       lacrima::Vec3 lastSatisfiedLocation;
 //
 //       REFLECT_BEGIN(NeedsComponent)
 //           REFLECT_FIELD(hunger)
@@ -169,12 +172,12 @@ namespace dt
 #define REFLECT_BEGIN(ClassName)                                                                    \
     public:                                                                                          \
     using DT_ReflectedSelf = ClassName;                                                              \
-    static const ::dt::TypeInfo& StaticTypeInfo()                                                    \
+    static const ::lacrima::TypeInfo& StaticTypeInfo()                                                    \
     {                                                                                                \
-        static ::dt::TypeInfo info = []() {                                                          \
-            ::dt::TypeInfo t;                                                                        \
+        static ::lacrima::TypeInfo info = []() {                                                          \
+            ::lacrima::TypeInfo t;                                                                        \
             t.name = #ClassName;                                                                     \
-            t.nameHash = ::dt::FnvHash(#ClassName);                                                   \
+            t.nameHash = ::lacrima::FnvHash(#ClassName);                                                   \
             t.sizeBytes = sizeof(ClassName);                                                         \
             t.constructInPlace = [](void* dest) { new (dest) ClassName(); };                         \
             t.destroyInPlace = [](void* obj) { static_cast<ClassName*>(obj)->~ClassName(); };        \
@@ -183,13 +186,13 @@ namespace dt
             };
 
 #define DT_REFLECT_FIELD_IMPL(FieldName, FieldTypeTag)                                               \
-            t.fields.push_back(::dt::FieldInfo{                                                      \
+            t.fields.push_back(::lacrima::FieldInfo{                                                      \
                 #FieldName,                                                                          \
                 FieldTypeTag,                                                                        \
                 offsetof(DT_ReflectedSelf, FieldName),                                                \
                 sizeof(decltype(DT_ReflectedSelf::FieldName)),                                        \
-                ::dt::DT_NestedTypeOf<decltype(DT_ReflectedSelf::FieldName)>::Get(),                   \
-                ::dt::FieldType::Bool /* unused for non-array fields */                               \
+                ::lacrima::DT_NestedTypeOf<decltype(DT_ReflectedSelf::FieldName)>::Get(),                   \
+                ::lacrima::FieldType::Bool /* unused for non-array fields */                               \
             });
 
 // REFLECT_FIELD infers FieldType from the field's declared C++ type via
@@ -198,7 +201,7 @@ namespace dt
 // typed - e.g. declaring an f64 field but tagging it FieldType::F32 would
 // silently corrupt binary serialization).
 #define REFLECT_FIELD(FieldName) \
-    DT_REFLECT_FIELD_IMPL(FieldName, (::dt::DT_FieldTypeOf<decltype(DT_ReflectedSelf::FieldName)>::value))
+    DT_REFLECT_FIELD_IMPL(FieldName, (::lacrima::DT_FieldTypeOf<decltype(DT_ReflectedSelf::FieldName)>::value))
 
 // REFLECT_FIELD_ARRAY is used for std::vector<T> fields specifically
 // (rather than folding this into REFLECT_FIELD's inference) because a
@@ -213,23 +216,23 @@ namespace dt
     do {                                                                                               \
         using VecT = decltype(DT_ReflectedSelf::FieldName);                                            \
         using ElemT = typename VecT::value_type;                                                       \
-        ::dt::FieldInfo fi;                                                                            \
+        ::lacrima::FieldInfo fi;                                                                            \
         fi.name = #FieldName;                                                                          \
-        fi.type = ::dt::FieldType::DynamicArray;                                                       \
+        fi.type = ::lacrima::FieldType::DynamicArray;                                                       \
         fi.byteOffset = offsetof(DT_ReflectedSelf, FieldName);                                          \
         fi.elementSize = sizeof(ElemT);                                                                 \
-        fi.nestedType = ::dt::DT_NestedTypeOf<ElemT>::Get();                                           \
-        fi.elementFieldType = ::dt::DT_FieldTypeOf<ElemT>::value;                               \
-        fi.arraySize = [](const void* p) -> ::dt::usize {                                              \
+        fi.nestedType = ::lacrima::DT_NestedTypeOf<ElemT>::Get();                                           \
+        fi.elementFieldType = ::lacrima::DT_FieldTypeOf<ElemT>::value;                               \
+        fi.arraySize = [](const void* p) -> ::lacrima::usize {                                              \
             return static_cast<const VecT*>(p)->size();                                                \
         };                                                                                              \
-        fi.arrayResizeForRead = [](void* p, ::dt::usize n) {                                            \
+        fi.arrayResizeForRead = [](void* p, ::lacrima::usize n) {                                            \
             static_cast<VecT*>(p)->resize(n);                                                           \
         };                                                                                              \
-        fi.arrayElementAt = [](void* p, ::dt::usize i) -> void* {                                      \
+        fi.arrayElementAt = [](void* p, ::lacrima::usize i) -> void* {                                      \
             return &(*static_cast<VecT*>(p))[i];                                                        \
         };                                                                                              \
-        fi.arrayElementAtConst = [](const void* p, ::dt::usize i) -> const void* {                     \
+        fi.arrayElementAtConst = [](const void* p, ::lacrima::usize i) -> const void* {                     \
             return &(*static_cast<const VecT*>(p))[i];                                                  \
         };                                                                                              \
         t.fields.push_back(fi);                                                                        \
@@ -240,7 +243,7 @@ namespace dt
         }();                                                                                         \
         return info;                                                                                 \
     }                                                                                                 \
-    static inline ::dt::TypeInfoRegistrar<DT_ReflectedSelf> DT_ReflectionRegistrar{};
+    static inline ::lacrima::TypeInfoRegistrar<DT_ReflectedSelf> DT_ReflectionRegistrar{};
 
 // ---------------------------------------------------------------------------
 // DT_FieldTypeOf: compile-time trait mapping a C++ type to its FieldType
@@ -251,7 +254,7 @@ namespace dt
 // primitive/math leaf types do.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     template <typename T, typename = void>
     struct DT_FieldTypeOf
@@ -278,6 +281,15 @@ namespace dt
     struct DT_FieldTypeOf<T, std::enable_if_t<std::is_enum_v<T>>>
     {
         static constexpr FieldType value = FieldType::Enum;
+    };
+
+    // Forward declare Handle so we can specialize DT_FieldTypeOf for it
+    template <typename T> struct Handle;
+
+    template <typename T>
+    struct DT_FieldTypeOf<Handle<T>>
+    {
+        static constexpr FieldType value = FieldType::HandleGeneric;
     };
 
     // Guards against a field declared as std::vector<T> being run through
@@ -326,4 +338,6 @@ namespace dt
     DT_DECLARE_FIELD_TYPE(f32, F32)
     DT_DECLARE_FIELD_TYPE(f64, F64)
     DT_DECLARE_FIELD_TYPE(std::string, String)
+    DT_DECLARE_FIELD_TYPE(lacrima::StringID, U64)
 }
+

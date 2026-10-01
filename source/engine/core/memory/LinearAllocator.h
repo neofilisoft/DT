@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/memory/MemoryTracker.h"
@@ -33,7 +34,7 @@
 // this file), which pays for an atomic fetch_add on the offset.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     class LinearAllocator
     {
@@ -43,9 +44,9 @@ namespace dt
             , m_offset(0)
             , m_category(category)
         {
-            DT_ASSERT(capacityBytes > 0, "LinearAllocator capacity must be nonzero");
+            LACRIMA_ASSERT(capacityBytes > 0, "LinearAllocator capacity must be nonzero");
             m_base = static_cast<u8*>(std::malloc(capacityBytes));
-            DT_ASSERT(m_base != nullptr, "LinearAllocator: failed to allocate backing block");
+            LACRIMA_ASSERT(m_base != nullptr, "LinearAllocator: failed to allocate backing block");
             DT_TRACK_ALLOC(m_base, capacityBytes, m_category);
         }
 
@@ -153,3 +154,5 @@ namespace dt
         MemoryCategory m_category;
     };
 }
+
+

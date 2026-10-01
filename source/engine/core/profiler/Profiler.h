@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/BuildConfig.h"
@@ -29,7 +30,7 @@
 // per-scope cost.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     struct ProfileEvent
     {
@@ -109,10 +110,10 @@ namespace dt
     #define DT_CONCAT(a, b) DT_CONCAT_INNER(a, b)
 
     #define DT_PROFILE_SCOPE(name) \
-        ::dt::ScopedProfileEvent DT_CONCAT(dt_profile_scope_, __LINE__)(name, nullptr)
+        ::lacrima::ScopedProfileEvent DT_CONCAT(dt_profile_scope_, __LINE__)(name, nullptr)
 
     #define DT_PROFILE_SCOPE_DYNAMIC(dynamicNameCStr) \
-        ::dt::ScopedProfileEvent DT_CONCAT(dt_profile_scope_, __LINE__)("Dynamic", dynamicNameCStr)
+        ::lacrima::ScopedProfileEvent DT_CONCAT(dt_profile_scope_, __LINE__)("Dynamic", dynamicNameCStr)
 
 #else
 
@@ -121,3 +122,4 @@ namespace dt
 
 #endif // DT_WITH_PROFILER
 }
+

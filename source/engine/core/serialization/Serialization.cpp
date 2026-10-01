@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/serialization/Serialization.h"
 #include "core/handle/Handle.h"
 #include "core/logging/Logger.h"
@@ -7,7 +8,7 @@
 #include <cstring>
 #include <unordered_map>
 
-namespace dt
+namespace lacrima
 {
     // -----------------------------------------------------------------------
     // Schema version table. A separate translation-unit-local map rather
@@ -24,7 +25,7 @@ namespace dt
         return table;
     }
 
-    u32 BinaryWriter::GetSchemaVersion(u64 typeNameHash)
+    u32 GetSchemaVersion(u64 typeNameHash)
     {
         auto it = SchemaVersionTable().find(typeNameHash);
         return (it != SchemaVersionTable().end()) ? it->second : 1u;
@@ -33,6 +34,20 @@ namespace dt
     void RegisterSchemaVersion(u64 typeNameHash, u32 version)
     {
         SchemaVersionTable()[typeNameHash] = version;
+    }
+
+    // -----------------------------------------------------------------------
+    // Migration registry. Maps typeNameHash to its explicit migration function.
+    // -----------------------------------------------------------------------
+    static std::unordered_map<u64, MigrationFunc>& MigrationRegistryTable()
+    {
+        static std::unordered_map<u64, MigrationFunc> table;
+        return table;
+    }
+
+    void RegisterMigration(u64 typeNameHash, MigrationFunc func)
+    {
+        MigrationRegistryTable()[typeNameHash] = std::move(func);
     }
 
     // -----------------------------------------------------------------------
@@ -105,13 +120,13 @@ namespace dt
             }
             case FieldType::NestedStruct:
             {
-                DT_ASSERT(field.nestedType != nullptr, "NestedStruct field missing TypeInfo pointer");
+                LACRIMA_ASSERT(field.nestedType != nullptr, "NestedStruct field missing TypeInfo pointer");
                 WriteObject(fieldPtr, *field.nestedType);
                 break;
             }
             case FieldType::DynamicArray:
             {
-                DT_ASSERT(field.arraySize != nullptr, "DynamicArray field missing arraySize accessor (was REFLECT_FIELD_ARRAY used?)");
+                LACRIMA_ASSERT(field.arraySize != nullptr, "DynamicArray field missing arraySize accessor (was REFLECT_FIELD_ARRAY used?)");
 
                 const usize count = field.arraySize(fieldPtr);
                 WritePrimitive<u32>(static_cast<u32>(count));
@@ -130,7 +145,7 @@ namespace dt
                 else if (field.elementSize == 2) WritePrimitive<u16>(*reinterpret_cast<const u16*>(fieldPtr));
                 else if (field.elementSize == 4) WritePrimitive<u32>(*reinterpret_cast<const u32*>(fieldPtr));
                 else if (field.elementSize == 8) WritePrimitive<u64>(*reinterpret_cast<const u64*>(fieldPtr));
-                else DT_ASSERT(false, "Unsupported enum size");
+                else LACRIMA_ASSERT(false, "Unsupported enum size");
                 break;
             }
         }
@@ -160,12 +175,39 @@ namespace dt
 
         if (storedHash != typeInfo.nameHash)
         {
-            DT_LOG_ERROR(LogCategory::Serialization,
+            LACRIMA_LOG_ERROR(LogCategory::Serialization,
                 "BinaryReader::ReadObject type mismatch: expected '{}' (hash {}), stream has hash {}",
                 std::string(typeInfo.name), typeInfo.nameHash, storedHash);
             return false;
         }
 
+        const u32 currentVersion = GetSchemaVersion(typeInfo.nameHash);
+        
+        if (storedVersion > currentVersion)
+        {
+            LACRIMA_LOG_ERROR(LogCategory::Serialization,
+                "BinaryReader::ReadObject version mismatch: stored version {} is newer than current version {} for type '{}'",
+                storedVersion, currentVersion, std::string(typeInfo.name));
+            return false;
+        }
+        else if (storedVersion < currentVersion)
+        {
+            auto it = MigrationRegistryTable().find(typeInfo.nameHash);
+            if (it != MigrationRegistryTable().end() && it->second)
+            {
+                // Let the custom migration function handle reading and upgrading
+                return it->second(*this, storedVersion, object);
+            }
+            else
+            {
+                LACRIMA_LOG_ERROR(LogCategory::Serialization,
+                    "BinaryReader::ReadObject missing migration: type '{}' stored version {} < current version {}, but no MigrationFunc registered",
+                    std::string(typeInfo.name), storedVersion, currentVersion);
+                return false;
+            }
+        }
+
+        // storedVersion == currentVersion: normal read
         for (const FieldInfo& field : typeInfo.fields)
         {
             u8* fieldPtr = static_cast<u8*>(object) + field.byteOffset;
@@ -250,13 +292,13 @@ namespace dt
             }
             case FieldType::NestedStruct:
             {
-                DT_ASSERT(field.nestedType != nullptr, "NestedStruct field missing TypeInfo pointer");
+                LACRIMA_ASSERT(field.nestedType != nullptr, "NestedStruct field missing TypeInfo pointer");
                 ReadObject(fieldPtr, *field.nestedType);
                 break;
             }
             case FieldType::DynamicArray:
             {
-                DT_ASSERT(field.arrayResizeForRead != nullptr, "DynamicArray field missing arrayResizeForRead accessor (was REFLECT_FIELD_ARRAY used?)");
+                LACRIMA_ASSERT(field.arrayResizeForRead != nullptr, "DynamicArray field missing arrayResizeForRead accessor (was REFLECT_FIELD_ARRAY used?)");
 
                 const u32 count = ReadPrimitive<u32>();
                 field.arrayResizeForRead(fieldPtr, count);
@@ -274,7 +316,7 @@ namespace dt
                 else if (field.elementSize == 2) *reinterpret_cast<u16*>(fieldPtr) = ReadPrimitive<u16>();
                 else if (field.elementSize == 4) *reinterpret_cast<u32*>(fieldPtr) = ReadPrimitive<u32>();
                 else if (field.elementSize == 8) *reinterpret_cast<u64*>(fieldPtr) = ReadPrimitive<u64>();
-                else DT_ASSERT(false, "Unsupported enum size");
+                else LACRIMA_ASSERT(false, "Unsupported enum size");
                 break;
             }
         }
@@ -369,14 +411,14 @@ namespace dt
             }
             case FieldType::NestedStruct:
             {
-                DT_ASSERT(field.nestedType != nullptr, "NestedStruct field missing TypeInfo pointer");
+                LACRIMA_ASSERT(field.nestedType != nullptr, "NestedStruct field missing TypeInfo pointer");
                 out << "\n";
                 WriteObjectRecursive(out, fieldPtr, *field.nestedType, indent + 1);
                 break;
             }
             case FieldType::DynamicArray:
             {
-                DT_ASSERT(field.arraySize != nullptr, "DynamicArray field missing arraySize accessor (was REFLECT_FIELD_ARRAY used?)");
+                LACRIMA_ASSERT(field.arraySize != nullptr, "DynamicArray field missing arraySize accessor (was REFLECT_FIELD_ARRAY used?)");
 
                 const usize count = field.arraySize(fieldPtr);
                 if (count == 0)
@@ -441,3 +483,5 @@ namespace dt
         out << "}";
     }
 }
+
+

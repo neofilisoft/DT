@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/uuid/UUID.h"
 #include "core/platform/Assert.h"
 
@@ -5,7 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace dt
+namespace lacrima
 {
     std::string UUID::ToString() const
     {
@@ -54,3 +55,4 @@ namespace dt
         return id;
     }
 }
+

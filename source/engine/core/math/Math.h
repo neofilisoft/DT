@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -26,7 +27,7 @@
 // internal representation changing.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     struct Vec2
     {
@@ -304,6 +305,82 @@ namespace dt
             result.m[15] = 1.0f;
             return result;
         }
+
+        static Mat4 Scale(const Vec3& s)
+        {
+            Mat4 result;
+            result.m[0] = s.x;
+            result.m[5] = s.y;
+            result.m[10] = s.z;
+            return result;
+        }
+
+        static Mat4 TRS(const Vec3& t, const Quat& r, const Vec3& s)
+        {
+            Mat4 rot = FromQuat(r);
+            rot.m[0] *= s.x; rot.m[1] *= s.x; rot.m[2] *= s.x;
+            rot.m[4] *= s.y; rot.m[5] *= s.y; rot.m[6] *= s.y;
+            rot.m[8] *= s.z; rot.m[9] *= s.z; rot.m[10] *= s.z;
+            rot.m[12] = t.x;
+            rot.m[13] = t.y;
+            rot.m[14] = t.z;
+            return rot;
+        }
+
+        Vec3 TransformPoint(const Vec3& p) const
+        {
+            f32 w = m[3] * p.x + m[7] * p.y + m[11] * p.z + m[15];
+            f32 invW = (std::abs(w) > 1e-8f) ? (1.0f / w) : 1.0f;
+            return Vec3(
+                (m[0] * p.x + m[4] * p.y + m[8]  * p.z + m[12]) * invW,
+                (m[1] * p.x + m[5] * p.y + m[9]  * p.z + m[13]) * invW,
+                (m[2] * p.x + m[6] * p.y + m[10] * p.z + m[14]) * invW
+            );
+        }
+
+        Vec3 TransformVector(const Vec3& v) const
+        {
+            return Vec3(
+                m[0] * v.x + m[4] * v.y + m[8]  * v.z,
+                m[1] * v.x + m[5] * v.y + m[9]  * v.z,
+                m[2] * v.x + m[6] * v.y + m[10] * v.z
+            );
+        }
+
+        Mat4 Inverted() const
+        {
+            f32 inv[16];
+            inv[0] = m[5]  * m[10] * m[15] - m[5]  * m[11] * m[14] - m[9]  * m[6]  * m[15] + m[9]  * m[7]  * m[14] + m[13] * m[6]  * m[11] - m[13] * m[7]  * m[10];
+            inv[4] = -m[4]  * m[10] * m[15] + m[4]  * m[11] * m[14] + m[8]  * m[6]  * m[15] - m[8]  * m[7]  * m[14] - m[12] * m[6]  * m[11] + m[12] * m[7]  * m[10];
+            inv[8] = m[4]  * m[9] * m[15] - m[4]  * m[11] * m[13] - m[8]  * m[5] * m[15] + m[8]  * m[7] * m[13] + m[12] * m[5] * m[11] - m[12] * m[7] * m[9];
+            inv[12] = -m[4]  * m[9] * m[14] + m[4]  * m[10] * m[13] + m[8]  * m[5] * m[14] - m[8]  * m[6] * m[13] - m[12] * m[5] * m[10] + m[12] * m[6] * m[9];
+            inv[1] = -m[1]  * m[10] * m[15] + m[1]  * m[11] * m[14] + m[9]  * m[2] * m[15] - m[9]  * m[3] * m[14] - m[13] * m[2] * m[11] + m[13] * m[3] * m[10];
+            inv[5] = m[0]  * m[10] * m[15] - m[0]  * m[11] * m[14] - m[8]  * m[2] * m[15] + m[8]  * m[3] * m[14] + m[12] * m[2] * m[11] - m[12] * m[3] * m[10];
+            inv[9] = -m[0]  * m[9] * m[15] + m[0]  * m[11] * m[13] + m[8]  * m[1] * m[15] - m[8]  * m[3] * m[13] - m[12] * m[1] * m[11] + m[12] * m[3] * m[9];
+            inv[13] = m[0]  * m[9] * m[14] - m[0]  * m[10] * m[13] - m[8]  * m[1] * m[14] + m[8]  * m[2] * m[13] + m[12] * m[1] * m[10] - m[12] * m[2] * m[9];
+            inv[2] = m[1]  * m[6] * m[15] - m[1]  * m[7] * m[14] - m[5]  * m[2] * m[15] + m[5]  * m[3] * m[14] + m[13] * m[2] * m[7] - m[13] * m[3] * m[6];
+            inv[6] = -m[0]  * m[6] * m[15] + m[0]  * m[7] * m[14] + m[4]  * m[2] * m[15] - m[4]  * m[3] * m[14] - m[12] * m[2] * m[7] + m[12] * m[3] * m[6];
+            inv[10] = m[0]  * m[5] * m[15] - m[0]  * m[7] * m[13] - m[4]  * m[1] * m[15] + m[4]  * m[3] * m[13] + m[12] * m[1] * m[7] - m[12] * m[3] * m[5];
+            inv[14] = -m[0]  * m[5] * m[14] + m[0]  * m[6] * m[13] + m[4]  * m[1] * m[14] - m[4]  * m[2] * m[13] - m[12] * m[1] * m[6] + m[12] * m[2] * m[5];
+            inv[3] = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11] - m[5] * m[3] * m[10] - m[9] * m[2] * m[7] + m[9] * m[3] * m[6];
+            inv[7] = m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11] + m[4] * m[3] * m[10] + m[8] * m[2] * m[7] - m[8] * m[3] * m[6];
+            inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
+            inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
+
+            f32 det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
+            if (std::abs(det) < 1e-8f)
+            {
+                return Identity();
+            }
+
+            f32 invDet = 1.0f / det;
+            Mat4 result;
+            for (int i = 0; i < 16; ++i)
+            {
+                result.m[i] = inv[i] * invDet;
+            }
+            return result;
+        }
     };
 
     namespace math
@@ -331,3 +408,4 @@ namespace dt
     template <> struct DT_FieldTypeOf<Quat> { static constexpr FieldType value = FieldType::Quat; };
     template <> struct DT_FieldTypeOf<Mat4> { static constexpr FieldType value = FieldType::Mat4; };
 }
+

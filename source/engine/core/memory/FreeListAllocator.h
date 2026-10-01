@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/memory/MemoryTracker.h"
@@ -31,7 +32,7 @@
 // not rewriting this into a lock-free allocator.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     class FreeListAllocator
     {
@@ -40,10 +41,10 @@ namespace dt
             : m_capacity(capacityBytes)
             , m_category(category)
         {
-            DT_ASSERT(capacityBytes >= sizeof(BlockHeader) * 2, "FreeListAllocator capacity too small");
+            LACRIMA_ASSERT(capacityBytes >= sizeof(BlockHeader) * 2, "FreeListAllocator capacity too small");
 
             m_base = static_cast<u8*>(std::malloc(capacityBytes));
-            DT_ASSERT(m_base != nullptr, "FreeListAllocator: failed to allocate backing block");
+            LACRIMA_ASSERT(m_base != nullptr, "FreeListAllocator: failed to allocate backing block");
             DT_TRACK_ALLOC(m_base, capacityBytes, m_category);
 
             BlockHeader* initial = reinterpret_cast<BlockHeader*>(m_base);
@@ -108,7 +109,7 @@ namespace dt
             std::lock_guard<std::mutex> lock(m_mutex);
 
             BlockHeader* block = PayloadToBlock(ptr);
-            DT_ASSERT(!block->free, "FreeListAllocator::Free called on already-free block (double free)");
+            LACRIMA_ASSERT(!block->free, "FreeListAllocator::Free called on already-free block (double free)");
             block->free = true;
 
             CoalesceWithNext(block);
@@ -194,3 +195,5 @@ namespace dt
         MemoryCategory m_category;
     };
 }
+
+

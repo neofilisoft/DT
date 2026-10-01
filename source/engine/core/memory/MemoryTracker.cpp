@@ -1,8 +1,9 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/memory/MemoryTracker.h"
 #include "core/logging/Logger.h"
 #include "core/platform/Assert.h"
 
-namespace dt
+namespace lacrima
 {
     const char* ToString(MemoryCategory category)
     {
@@ -73,7 +74,7 @@ namespace dt
             // call DT_TRACK_ALLOC) - report it rather than silently
             // ignoring, since silently ignoring is exactly how allocator
             // bugs go unnoticed until they crash in Shipping.
-            DT_ASSERT(false, "MemoryTracker::OnFree called on untracked pointer");
+            LACRIMA_ASSERT(false, "MemoryTracker::OnFree called on untracked pointer");
             return;
         }
 
@@ -109,12 +110,12 @@ namespace dt
             return true;
         }
 
-        DT_LOG_ERROR(LogCategory::Core, "Memory leak check failed: {} live allocation(s), {} live byte(s)",
+        LACRIMA_LOG_ERROR(LogCategory::Core, "Memory leak check failed: {} live allocation(s), {} live byte(s)",
             m_records.size(), m_totalStats.liveBytes);
 
         for (const auto& [ptr, record] : m_records)
         {
-            DT_LOG_ERROR(LogCategory::Core, "  Leaked {} byte(s), category={}, allocated at {}:{}",
+            LACRIMA_LOG_ERROR(LogCategory::Core, "  Leaked {} byte(s), category={}, allocated at {}:{}",
                 record.size, ToString(record.category), record.file, record.line);
         }
 
@@ -123,3 +124,5 @@ namespace dt
 
 #endif // DT_WITH_MEMORY_TRACKING
 }
+
+

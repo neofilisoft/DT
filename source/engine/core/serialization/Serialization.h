@@ -1,10 +1,13 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Assert.h"
 #include "core/platform/Types.h"
 #include "core/reflection/Reflection.h"
+#include "core/logging/Logger.h"
 
 #include <cstring>
+#include <functional>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -37,13 +40,25 @@
 // and only matters if the engine is ever ported to a big-endian target.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     // Call once (typically at module static-init, or explicitly in
     // engine startup) when a reflected type's on-disk layout changes in a
     // way that requires migration logic in BinaryReader::ReadField. Types
     // that never call this default to schema version 1 forever.
     void RegisterSchemaVersion(u64 typeNameHash, u32 version);
+
+    // Schema version lookup - defaults to 1 unless a type has an
+    // explicit override registered via RegisterSchemaVersion.
+    u32 GetSchemaVersion(u64 typeNameHash);
+
+    class BinaryReader;
+    using MigrationFunc = std::function<bool(BinaryReader& reader, u32 storedVersion, void* object)>;
+    
+    // Registers a custom migration function for a type. When ReadObject encounters
+    // a stored schema version < current schema version, it calls this function to
+    // allow manual reading and upgrading of the old binary layout.
+    void RegisterMigration(u64 typeNameHash, MigrationFunc func);
 
     // ---------------------------------------------------------------------
     // BinaryWriter / BinaryReader
@@ -93,12 +108,6 @@ namespace dt
         void WriteArrayElement(const u8* elemPtr, const FieldInfo& arrayField);
 
         std::vector<u8> m_buffer;
-
-        // Schema version lookup - defaults to 1 unless a type has an
-        // explicit override registered via RegisterSchemaVersion (called
-        // from a type's REFLECT_END expansion in future iterations once a
-        // field is added; see file header comment on versioning policy).
-        static u32 GetSchemaVersion(u64 typeNameHash);
     };
 
     class BinaryReader
@@ -106,21 +115,52 @@ namespace dt
     public:
         explicit BinaryReader(const std::vector<u8>& data) : m_data(data), m_offset(0) {}
 
+        bool HasError() const { return m_hasError; }
+
         template <typename T>
         T ReadPrimitive()
         {
             static_assert(std::is_trivially_copyable_v<T>, "ReadPrimitive requires a trivially copyable type");
-            DT_ASSERT(m_offset + sizeof(T) <= m_data.size(), "BinaryReader: read past end of buffer");
+            // C4 fix: fallible bounds check that survives Shipping builds (no assert stripping).
+            if (m_offset + sizeof(T) > m_data.size())
+            {
+                LACRIMA_LOG_ERROR(LogCategory::Core, "BinaryReader: read past end of buffer (offset={}, need={}, size={})",
+                    m_offset, sizeof(T), m_data.size());
+                m_hasError = true;
+                return T{};
+            }
             T value;
             std::memcpy(&value, m_data.data() + m_offset, sizeof(T));
             m_offset += sizeof(T);
             return value;
         }
 
+        bool ReadBytes(void* dest, usize size)
+        {
+            if (m_offset + size > m_data.size())
+            {
+                LACRIMA_LOG_ERROR(LogCategory::Core, "BinaryReader: read past end of buffer (offset={}, need={}, size={})",
+                    m_offset, size, m_data.size());
+                m_hasError = true;
+                return false;
+            }
+            std::memcpy(dest, m_data.data() + m_offset, size);
+            m_offset += size;
+            return true;
+        }
+
         std::string ReadString()
         {
             const u32 len = ReadPrimitive<u32>();
-            DT_ASSERT(m_offset + len <= m_data.size(), "BinaryReader: string length exceeds buffer");
+            if (m_hasError) return {};
+            // C4 fix: validate string length against remaining buffer before advancing.
+            if (m_offset + static_cast<usize>(len) > m_data.size())
+            {
+                LACRIMA_LOG_ERROR(LogCategory::Core, "BinaryReader: string length {} exceeds buffer remainder {}",
+                    len, m_data.size() - m_offset);
+                m_hasError = true;
+                return {};
+            }
             std::string result(reinterpret_cast<const char*>(m_data.data() + m_offset), len);
             m_offset += len;
             return result;
@@ -140,6 +180,7 @@ namespace dt
 
         const std::vector<u8>& m_data;
         usize m_offset;
+        bool m_hasError{ false }; // C4 fix: sticky error flag - survives Shipping builds
     };
 
     // ---------------------------------------------------------------------
@@ -170,3 +211,7 @@ namespace dt
         static void Indent(std::ostringstream& out, int level);
     };
 }
+
+
+
+

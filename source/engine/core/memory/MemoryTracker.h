@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/BuildConfig.h"
@@ -30,7 +31,7 @@
 // actually matter (Shipping, see DT_WITH_MEMORY_TRACKING in BuildConfig.h).
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     enum class MemoryCategory : u8
     {
@@ -93,9 +94,9 @@ namespace dt
     };
 
     #define DT_TRACK_ALLOC(ptr, bytes, category) \
-        ::dt::MemoryTracker::Get().OnAlloc((ptr), (bytes), (category), __FILE__, __LINE__)
+        ::lacrima::MemoryTracker::Get().OnAlloc((ptr), (bytes), (category), __FILE__, __LINE__)
     #define DT_TRACK_FREE(ptr) \
-        ::dt::MemoryTracker::Get().OnFree((ptr))
+        ::lacrima::MemoryTracker::Get().OnFree((ptr))
 
 #else
 
@@ -104,3 +105,4 @@ namespace dt
 
 #endif // DT_WITH_MEMORY_TRACKING
 }
+

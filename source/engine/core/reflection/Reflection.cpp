@@ -1,8 +1,9 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/reflection/Reflection.h"
 #include "core/logging/Logger.h"
 #include "core/platform/Assert.h"
 
-namespace dt
+namespace lacrima
 {
     TypeRegistry& TypeRegistry::Get()
     {
@@ -12,7 +13,7 @@ namespace dt
 
     void TypeRegistry::Register(const TypeInfo* info)
     {
-        // Static-init-order: this runs as part of dt::TypeInfoRegistrar<T>
+        // Static-init-order: this runs as part of lacrima::TypeInfoRegistrar<T>
         // instances constructing at static-init time, potentially across
         // multiple translation units with no defined relative order
         // between TUs (only within a single TU is order defined). Register
@@ -25,7 +26,7 @@ namespace dt
         {
             if (existing->nameHash == info->nameHash)
             {
-                DT_LOG_ERROR(LogCategory::Reflection,
+                LACRIMA_LOG_ERROR(LogCategory::Reflection,
                     "Duplicate TypeInfo registration for type '{}' (hash collision or duplicate REFLECT_BEGIN)",
                     std::string(info->name));
                 return;
@@ -51,3 +52,5 @@ namespace dt
         return Find(FnvHash(name));
     }
 }
+
+

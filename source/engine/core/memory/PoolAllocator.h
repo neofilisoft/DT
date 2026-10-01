@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/memory/MemoryTracker.h"
@@ -30,7 +31,7 @@
 // "recycled for something else" block cannot occur here.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     class PoolAllocator
     {
@@ -40,12 +41,12 @@ namespace dt
             , m_blockCount(blockCount)
             , m_category(category)
         {
-            DT_ASSERT(blockSize > 0, "PoolAllocator block size must be nonzero");
-            DT_ASSERT(blockCount > 0, "PoolAllocator block count must be nonzero");
+            LACRIMA_ASSERT(blockSize > 0, "PoolAllocator block size must be nonzero");
+            LACRIMA_ASSERT(blockCount > 0, "PoolAllocator block count must be nonzero");
 
             const usize totalBytes = m_blockSize * m_blockCount;
             m_base = static_cast<u8*>(std::malloc(totalBytes));
-            DT_ASSERT(m_base != nullptr, "PoolAllocator: failed to allocate backing block");
+            LACRIMA_ASSERT(m_base != nullptr, "PoolAllocator: failed to allocate backing block");
             DT_TRACK_ALLOC(m_base, totalBytes, m_category);
 
             // Thread every block into the initial freelist.
@@ -66,7 +67,7 @@ namespace dt
             // into this pool past the pool's own lifetime - which will be a
             // use-after-free the moment the backing block is freed below.
             // This assert is the earliest point that bug can be caught.
-            DT_ASSERT(m_liveCount.load(std::memory_order_acquire) == 0,
+            LACRIMA_ASSERT(m_liveCount.load(std::memory_order_acquire) == 0,
                 "PoolAllocator destroyed with live allocations outstanding");
 
             DT_TRACK_FREE(m_base);
@@ -107,7 +108,7 @@ namespace dt
                 return;
             }
 
-            DT_ASSERT(OwnsPointer(ptr), "PoolAllocator::Free called with pointer not owned by this pool");
+            LACRIMA_ASSERT(OwnsPointer(ptr), "PoolAllocator::Free called with pointer not owned by this pool");
 
             Node* node = static_cast<Node*>(ptr);
             Node* head = m_freeListHead.load(std::memory_order_acquire);
@@ -144,3 +145,5 @@ namespace dt
         MemoryCategory m_category;
     };
 }
+
+

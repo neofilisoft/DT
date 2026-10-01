@@ -1,8 +1,9 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "core/profiler/Profiler.h"
 
 #include <thread>
 
-namespace dt
+namespace lacrima
 {
     void ProfilerThreadBuffer::RecordScope(const char* staticName, std::string dynamicName, u64 startNs, u64 endNs)
     {
@@ -80,3 +81,4 @@ namespace dt
         return merged;
     }
 }
+

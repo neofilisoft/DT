@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include <cstddef>
@@ -19,7 +20,7 @@
 //    header elsewhere.
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     using i8  = std::int8_t;
     using i16 = std::int16_t;
@@ -45,3 +46,4 @@ namespace dt
     static_assert(sizeof(f32) == 4, "DTEngine requires IEEE-754 32-bit float.");
     static_assert(sizeof(f64) == 8, "DTEngine requires IEEE-754 64-bit double.");
 }
+

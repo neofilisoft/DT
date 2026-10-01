@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -25,7 +26,7 @@
 // serialization/cross-reference points (not on the simulation hot path).
 // ---------------------------------------------------------------------------
 
-namespace dt
+namespace lacrima
 {
     class UUID
     {
@@ -104,3 +105,4 @@ namespace dt
 
     template <> struct DT_FieldTypeOf<UUID> { static constexpr FieldType value = FieldType::UUID; };
 }
+
