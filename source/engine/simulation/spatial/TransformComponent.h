@@ -1,9 +1,10 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
 #include "core/reflection/Reflection.h"
 
-namespace dt::sim
+namespace lacrima::sim
 {
     struct TransformComponent
     {
@@ -20,3 +21,4 @@ namespace dt::sim
         REFLECT_END()
     };
 }
+

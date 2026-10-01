@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/handle/Handle.h"
@@ -10,6 +11,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include "core/string/StringID.h"
 #include <string>
 #include <vector>
 
@@ -53,9 +55,9 @@
 //     branch anywhere in the engine
 // ---------------------------------------------------------------------------
 
-namespace dt::sim
+namespace lacrima::sim
 {
-    using Entity = dt::Entity;
+    using Entity = lacrima::Entity;
 
     // Alias, not a redeclaration - the actual enum is script::ScriptStepResult
     // (see scripting/ScriptStepResult.h for why it's homed there: it
@@ -68,7 +70,7 @@ namespace dt::sim
 
     struct InteractionDef
     {
-        std::string name;
+        lacrima::StringID name;
         std::string luaCheckFunction;  // Lua global function name: bool(Entity actor, Entity target)
         std::string luaRunFunction;    // Lua coroutine function name: InteractionStepResult(Entity actor, Entity target, f32 dt)
         f32 basePriority = 0.0f;       // used for autonomy ranking, see AutonomySystem.h
@@ -84,7 +86,7 @@ namespace dt::sim
     {
     public:
         void Register(InteractionDef def);
-        const InteractionDef* Find(const std::string& name) const;
+        const InteractionDef* Find(lacrima::StringID name) const;
         const std::vector<InteractionDef>& All() const { return m_interactions; }
 
     private:
@@ -180,3 +182,4 @@ namespace dt::sim
         const InteractionDef* m_frontCoroutineOwner = nullptr; // which InteractionDef m_frontCoroutine belongs to, to detect front-changed
     };
 }
+

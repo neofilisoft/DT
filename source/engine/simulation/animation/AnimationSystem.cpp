@@ -1,7 +1,8 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "simulation/animation/AnimationSystem.h"
 #include "runtime/Entity.h"
 
-namespace dt::sim
+namespace lacrima::sim
 {
     void AnimationSystem::StepAnimations(f32 fixedDeltaSeconds, ComponentArray<Entity, VisualComponent>& visuals)
     {
@@ -67,3 +68,4 @@ namespace dt::sim
         }
     }
 }
+

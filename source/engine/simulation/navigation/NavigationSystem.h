@@ -1,9 +1,10 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 #include "NavMesh.h"
 #include "NavAgentComponent.h"
 #include "simulation/spatial/TransformComponent.h"
 
-namespace dt::sim
+namespace lacrima::sim
 {
     class SimulationWorld;
 
@@ -26,7 +27,13 @@ namespace dt::sim
         /**
          * @brief Request a path. (Synchronous for now, can be made async)
          */
-        std::vector<dt::Vec3> FindPath(const dt::Vec3& start, const dt::Vec3& end) const;
+        std::vector<lacrima::Vec3> FindPath(const lacrima::Vec3& start, const lacrima::Vec3& end) const;
+
+        /**
+         * @brief Casts a ray on the navmesh from start to end.
+         * @return True if the ray hit a wall/boundary (line of sight is blocked), false if the path is clear.
+         */
+        bool Raycast(const lacrima::Vec3& start, const lacrima::Vec3& end, lacrima::Vec3& outHitPosition) const;
 
         /**
          * @brief Update agents
@@ -37,3 +44,4 @@ namespace dt::sim
         NavMesh m_navMesh;
     };
 }
+

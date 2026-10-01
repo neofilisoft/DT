@@ -1,10 +1,12 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
 #include "core/reflection/Reflection.h"
+#include "core/string/StringID.h"
 #include <string>
 
-namespace dt::sim
+namespace lacrima::sim
 {
     // Simple state machine states for M10.
     // In a future data-driven version, this might just be hashed strings.
@@ -29,9 +31,8 @@ namespace dt::sim
 
     struct VisualComponent
     {
-        // For M10, 0 means default sprite, >0 could be mesh or other sprites
-        u32 visualId = 0;
-
+        lacrima::StringID visualId;
+        
         AnimationState currentState = AnimationState::Idle;
         
         // Playback state
@@ -43,8 +44,12 @@ namespace dt::sim
         u32 totalFrames = 1;
         u32 framesPerRow = 1;
 
+        lacrima::StringID assetPath;
+        float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+
         REFLECT_BEGIN(VisualComponent)
             REFLECT_FIELD(visualId)
+            REFLECT_FIELD(assetPath)
             REFLECT_FIELD(currentState)
             REFLECT_FIELD(currentFrame)
             REFLECT_FIELD(playbackSpeed)
@@ -54,3 +59,4 @@ namespace dt::sim
         REFLECT_END()
     };
 }
+

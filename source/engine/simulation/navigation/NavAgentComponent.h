@@ -1,8 +1,10 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 #include "core/math/Math.h"
+#include "core/reflection/Reflection.h"
 #include <vector>
 
-namespace dt::sim
+namespace lacrima::sim
 {
     /**
      * @brief Component indicating an entity can navigate using the NavMesh.
@@ -30,5 +32,14 @@ namespace dt::sim
             currentWaypointIndex = 0;
             hasPath = false;
         }
+
+        REFLECT_BEGIN(NavAgentComponent)
+            REFLECT_FIELD_ARRAY(currentPath)
+            REFLECT_FIELD(currentWaypointIndex)
+            REFLECT_FIELD(moveSpeed)
+            REFLECT_FIELD(pathRadius)
+            REFLECT_FIELD(hasPath)
+        REFLECT_END()
     };
 }
+

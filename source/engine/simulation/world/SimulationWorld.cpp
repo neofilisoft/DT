@@ -1,151 +1,34 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "simulation/world/SimulationWorld.h"
+#include "simulation/spatial/SpringArmSystem.h"
+#include "simulation/animation/SkeletalAnimationSystem.h"
+#include "simulation/animation/VehicleSystem.h"
+#include "simulation/animation/FootIKSystem.h"
+#include "physics/include/physics/IPhysicsSystem.h"
 #include "simulation/animation/AnimationSystem.h"
+#include "simulation/sprite/SpriteAnimationSystem.h"
 #include "core/input/InputManager.h"
 #include "core/profiler/Profiler.h"
 #include "core/logging/Logger.h"
 #include "core/serialization/Serialization.h"
+#include "core/io/Compression.h"
+#include "core/jobs/JobSystem.h"
+#include <fstream>
+#include <iostream>
 #include "simulation/spatial/SpatialSystem.h"
+#include "simulation/spatial/LODSystem.h"
 
 #include <cmath>
+#include <cstdio>
 
-namespace dt::sim
+namespace lacrima::sim
 {
-    std::vector<AutonomyCandidate> GlobalInteractionPool::BuildCandidates() const
-    {
-        std::vector<AutonomyCandidate> candidates;
-        candidates.reserve(table.All().size());
-
-        for (const InteractionDef& def : table.All())
-        {
-            AutonomyCandidate candidate;
-            candidate.def = &def;
-            candidates.push_back(candidate);
-        }
-
-        return candidates;
-    }
-
-    namespace
-    {
-        // Concrete global interaction content - "Rest" and
-        // "GrabASnack", the two always-available actions a Sim can perform
-        // with no object/spatial dependency. Their satisfaction weighting
-        // (used for autonomy SCORING, kept in fast C++ per AutonomySystem's
-        // design goal - see AutonomySystem.h) is declared here; their
-        // actual EXECUTION behavior now lives in real Lua source (see
-        // LoadBuiltinInteractionScripts below), not in C++ at all.
-        constexpr f32 kRestSatisfactionWeight = 8.0f;
-        constexpr f32 kSnackSatisfactionWeight = 6.0f;
-
-        // Embedded inline as a string literal rather than a .lua file
-        // loaded via FileSystem: this is explicitly a temporary home for
-        // built-in engine-level "always available" interaction content.
-        // Once the asset/.asset content pipeline exists, this moves to a
-        // real .lua file loaded through FileSystem/ScriptEngine::LoadFile,
-        // and ownership likely shifts to game-layer content (Domaintic
-        // authoring its own Rest/GrabASnack variants) rather than being
-        // hardcoded engine behavior.
-        //
-        // Lua-side contract: dt.get_need(entity, needName) -> number,
-        // dt.satisfy_need(entity, needName, amount) -> nil are the bound
-        // API functions (see SimulationWorld::RegisterLuaBindings).
-        constexpr const char* kBuiltinInteractionScript = R"LUA(
-function Rest_Check(actor, target)
-    -- Always available - no precondition beyond existing. A real object-
-    -- gated interaction's check function would test things like
-    -- "is target a valid Bed" or "is actor already at target's location";
-    -- global interactions have no target object to check.
-    return true
-end
-
-function Rest_Run(actor, target, dt)
-    dt_engine.satisfy_need(actor, "Energy", 8.0)
-    return "complete"
-end
-
-function GrabASnack_Check(actor, target)
-    return true
-end
-
-function GrabASnack_Run(actor, target, dt)
-    -- Demonstrates genuine multi-tick execution via coroutine.yield,
-    -- proving ScriptCoroutine's "pause mid-Lua-function, resume next
-    -- tick" mechanism actually works end-to-end, not just single-call
-    -- functions that happen to return immediately.
-    coroutine.yield("continue")
-    
-    -- Play a sound when snacking!
-    dt_engine.play_sound("test_sound.wav")
-    
-    dt_engine.satisfy_need(actor, "Hunger", 6.0)
-    return "complete"
-end
-)LUA";
-    }
-
     SimulationWorld::SimulationWorld(usize initialEntityCount)
     {
-        for (auto& def : m_needDefinitions)
-        {
-            def.minValue = 0.0f;
-            def.maxValue = 100.0f;
-            def.convergence = 100.0f;
-            def.failureThreshold = 0.0f;
-            def.decayRatePerSecond = 0.5f;
-            def.autonomyWeight = 1.0f;
-        }
-        m_needDefinitions[static_cast<usize>(NeedId::Hunger)].decayRatePerSecond = 1.2f;
-        m_needDefinitions[static_cast<usize>(NeedId::Energy)].decayRatePerSecond = 0.8f;
-
-        InteractionDef rest;
-        rest.name = "Rest";
-        rest.luaCheckFunction = "Rest_Check";
-        rest.luaRunFunction = "Rest_Run";
-        rest.basePriority = 0.0f;
-        m_globalInteractions.table.Register(rest);
-
-        InteractionDef snack;
-        snack.name = "GrabASnack";
-        snack.luaCheckFunction = "GrabASnack_Check";
-        snack.luaRunFunction = "GrabASnack_Run";
-        snack.basePriority = 0.0f;
-        m_globalInteractions.table.Register(snack);
-
-        m_needs.Reserve(initialEntityCount);
-        m_queues.Reserve(initialEntityCount);
-        m_transforms.Reserve(initialEntityCount);
-        m_interactables.Reserve(initialEntityCount);
-        m_navAgents.Reserve(initialEntityCount);
-
-        for (usize i = 0; i < initialEntityCount; ++i)
-        {
-            Entity e = CreateEntity();
-
-            NeedsComponent needs;
-            for (usize n = 0; n < kNeedCount; ++n)
-            {
-                needs.values[n] = 60.0f + 35.0f * std::sin(static_cast<f32>(i * 7 + n * 3));
-                needs.values[n] = std::clamp(needs.values[n], 0.0f, 100.0f);
-            }
-            m_needs.Add(e, needs);
-            m_queues.Add(e);
-            
-            TransformComponent transform;
-            transform.x = static_cast<f32>(i % 4) * 2.0f;
-            transform.z = static_cast<f32>(i / 4) * 2.0f;
-            m_transforms.Add(e, transform);
-
-            VisualComponent visual;
-            visual.visualId = 1; // Default to some test sprite/mesh
-            dt::sim::AnimationSystem::SetupSpriteAnimation(visual, AnimationState::Idle);
-            m_visuals.Add(e, visual);
-        }
-
+        m_worldStreamer.Init();
         RegisterLuaBindings();
-        LoadBuiltinInteractionScripts();
         
         m_navigationSystem.Initialize(this);
-        // Temporary testing nav mesh setup
         m_navigationSystem.CreateTestNavMesh();
 
         BuildTickGraph();
@@ -156,76 +39,42 @@ end
         return m_entities.Create();
     }
 
+    void SimulationWorld::DestroyEntity(Entity entity)
+    {
+        m_transforms.Remove(entity);
+        m_visuals.Remove(entity);
+        m_sprites.Remove(entity);
+        m_interactables.Remove(entity);
+        m_navAgents.Remove(entity);
+        m_lotGrids.Remove(entity);
+        m_routingSlots.Remove(entity);
+        m_springArms.Remove(entity);
+        m_entities.Destroy(entity);
+    }
+
     void SimulationWorld::RegisterLuaBindings()
     {
         sol::state& lua = m_scriptEngine.Raw();
 
-        // Entity as an opaque usertype: index/generation exposed read-only
-        // (useful for debug printing from Lua, e.g. print(actor.index)),
-        // no writable fields and no Lua-side constructor exposed - Lua
-        // scripts receive Entity values from the engine (as coroutine
-        // arguments) and pass them back into bound API calls; they cannot
-        // fabricate a new Entity from scratch, which would bypass
-        // SlotMap's generation validity checking entirely.
         lua.new_usertype<Entity>("Entity",
             sol::no_constructor,
             "index", sol::readonly(&Entity::index),
             "generation", sol::readonly(&Entity::generation)
         );
 
-        // dt_engine.* namespace table - the bound API surface gameplay Lua
-        // scripts call into. Kept as a named table (not global bare
-        // functions) so script authors can see at a glance which calls are
-        // engine-provided versus their own script-local functions, and so
-        // future bound functions have an obvious place to land without
-        // further polluting the global namespace.
         sol::table dtEngine = lua.create_named_table("dt_engine");
-
-        dtEngine.set_function("get_need", [this](Entity entity, const std::string& needName) -> f32
-        {
-            NeedsComponent* needs = m_needs.Get(entity);
-            if (needs == nullptr)
-            {
-                DT_LOG_WARN(LogCategory::Scripting, "dt_engine.get_need: entity has no NeedsComponent");
-                return 0.0f;
-            }
-
-            for (usize i = 0; i < kNeedCount; ++i)
-            {
-                if (std::string(ToString(static_cast<NeedId>(i))) == needName)
-                {
-                    return needs->values[i];
-                }
-            }
-
-            DT_LOG_WARN(LogCategory::Scripting, "dt_engine.get_need: unknown need name '{}'", needName);
-            return 0.0f;
-        });
-
-        dtEngine.set_function("satisfy_need", [this](Entity entity, const std::string& needName, f32 amount)
-        {
-            NeedsComponent* needs = m_needs.Get(entity);
-            if (needs == nullptr)
-            {
-                DT_LOG_WARN(LogCategory::Scripting, "dt_engine.satisfy_need: entity has no NeedsComponent");
-                return;
-            }
-
-            for (usize i = 0; i < kNeedCount; ++i)
-            {
-                if (std::string(ToString(static_cast<NeedId>(i))) == needName)
-                {
-                    ApplyNeedDelta(*needs, m_needDefinitions[i], static_cast<NeedId>(i), amount);
-                    return;
-                }
-            }
-
-            DT_LOG_WARN(LogCategory::Scripting, "dt_engine.satisfy_need: unknown need name '{}'", needName);
-        });
 
         dtEngine.set_function("play_sound", [this](const std::string& path)
         {
             if (m_playSoundCallback)
+                m_playSoundCallback(path);
+        });
+
+        dtEngine.set_function("play_sound_2d", [this](const std::string& path, f32 volume)
+        {
+            if (m_playSoundVolumeCallback)
+                m_playSoundVolumeCallback(path, volume);
+            else if (m_playSoundCallback)
                 m_playSoundCallback(path);
         });
 
@@ -234,7 +83,7 @@ end
             VisualComponent* visual = m_visuals.Get(entity);
             if (visual == nullptr)
             {
-                DT_LOG_WARN(LogCategory::Scripting, "dt_engine.set_animation_state: entity has no VisualComponent");
+                LACRIMA_LOG_WARN(LogCategory::Scripting, "dt_engine.set_animation_state: entity has no VisualComponent");
                 return;
             }
 
@@ -244,91 +93,224 @@ end
             else if (stateName == "Idle") state = AnimationState::Idle;
             else
             {
-                DT_LOG_WARN(LogCategory::Scripting, "dt_engine.set_animation_state: unknown state '{}'", stateName);
+                LACRIMA_LOG_WARN(LogCategory::Scripting, "dt_engine.set_animation_state: unknown state '%s'", stateName.c_str());
                 return;
             }
 
-            dt::sim::AnimationSystem::SetupSpriteAnimation(*visual, state);
+            lacrima::sim::AnimationSystem::SetupSpriteAnimation(*visual, state);
         });
 
-        // Input bindings - scripts can poll action state without knowing the device.
-        // Action names match input.ini (e.g. "Interact", "Jump", "MoveUp").
-        // These read from InputManager which is written by the render thread - the
-        // values are one frame stale at most, which is acceptable for gameplay logic.
+        dtEngine.set_function("set_sprite_texture", [this](Entity entity, const std::string& asset)
+        {
+            Sprite2DComponent* sprite = m_sprites.Get(entity);
+            if (sprite != nullptr)
+                sprite->textureAsset = StringID(asset);
+        });
+
+        dtEngine.set_function("set_sprite_animation", [this](Entity entity, const std::string& texture, u32 firstFrame, u32 frameCount, f32 framesPerSecond, bool looping, u32 atlasColumns, u32 atlasRows)
+        {
+            Sprite2DComponent* sprite = m_sprites.Get(entity);
+            if (sprite == nullptr)
+                return;
+
+            sprite->animationEnabled = true;
+            sprite->animationClip.id = StringID(texture + "#animation");
+            sprite->animationClip.atlasTexture = StringID(texture);
+            sprite->animationClip.firstFrame = firstFrame;
+            sprite->animationClip.frameCount = std::max(1u, frameCount);
+            sprite->animationClip.framesPerSecond = std::max(0.0f, framesPerSecond);
+            sprite->animationClip.looping = looping;
+            sprite->animationClip.atlasColumns = std::max(1u, atlasColumns);
+            sprite->animationClip.atlasRows = std::max(1u, atlasRows);
+            sprite->animationPlayer.Play(sprite->animationClip, true);
+        });
+
+        dtEngine.set_function("set_sprite_uv", [this](Entity entity, f32 u, f32 v, f32 width, f32 height)
+        {
+            Sprite2DComponent* sprite = m_sprites.Get(entity);
+            if (sprite != nullptr)
+            {
+                sprite->uv.u = u;
+                sprite->uv.v = v;
+                sprite->uv.width = width;
+                sprite->uv.height = height;
+            }
+        });
+
+        dtEngine.set_function("set_sprite_size", [this](Entity entity, f32 width, f32 height)
+        {
+            Sprite2DComponent* sprite = m_sprites.Get(entity);
+            if (sprite != nullptr)
+            {
+                sprite->width = width;
+                sprite->height = height;
+            }
+        });
+
+        dtEngine.set_function("set_sprite_tint", [this](Entity entity, f32 r, f32 g, f32 b, f32 a)
+        {
+            Sprite2DComponent* sprite = m_sprites.Get(entity);
+            if (sprite != nullptr)
+            {
+                sprite->tintR = r;
+                sprite->tintG = g;
+                sprite->tintB = b;
+                sprite->tintA = a;
+            }
+        });
+
         dtEngine.set_function("is_action_pressed", [](const std::string& name) -> bool
         {
-            return dt::InputManager::Get().IsActionPressed(name);
+            return lacrima::InputManager::Get().IsActionPressed(name);
         });
 
         dtEngine.set_function("is_action_held", [](const std::string& name) -> bool
         {
-            return dt::InputManager::Get().IsActionHeld(name);
+            return lacrima::InputManager::Get().IsActionHeld(name);
         });
 
         dtEngine.set_function("get_axis", [](const std::string& name) -> f32
         {
-            return dt::InputManager::Get().GetAxis(name);
+            return lacrima::InputManager::Get().GetAxis(name);
         });
     }
 
-    void SimulationWorld::SaveState(dt::BinaryWriter& writer) const
+    void SimulationWorld::CopyFrom(const SimulationWorld& other)
+    {
+        m_clock = other.m_clock;
+        m_entities = other.m_entities;
+        m_transforms = other.m_transforms;
+        m_interactables = other.m_interactables;
+        m_visuals = other.m_visuals;
+        m_sprites = other.m_sprites;
+        m_navAgents = other.m_navAgents;
+        m_lods = other.m_lods;
+        m_lotGrids = other.m_lotGrids;
+        m_routingSlots = other.m_routingSlots;
+        m_springArms = other.m_springArms;
+        m_skeletalMeshes = other.m_skeletalMeshes;
+        m_footIKs  = other.m_footIKs;
+        // Note: VehicleComponent.controller is a raw ptr owned by IPhysicsSystem.
+        // On Clone (PIE start) we copy the authored parameters but NOT the live controller ptr.
+        // VehicleSystem will lazily re-create controllers for the cloned world.
+        m_vehicles = other.m_vehicles;
+        // Reset live controller ptrs - VehicleSystem lazily re-creates them for the cloned world (PIE).
+        m_vehicles.ForEach([](Entity, VehicleComponent& vc) { vc.controller = nullptr; });
+
+        m_physicsSystem = other.m_physicsSystem;
+        m_playSoundCallback = other.m_playSoundCallback;
+        m_playSoundVolumeCallback = other.m_playSoundVolumeCallback;
+    }
+
+    std::unique_ptr<SimulationWorld> SimulationWorld::Clone() const
+    {
+        auto clone = std::make_unique<SimulationWorld>(m_entities.LiveCount() > 0 ? m_entities.LiveCount() : 12);
+        clone->CopyFrom(*this);
+        clone->FinalizeTickGraph();
+        return clone;
+    }
+
+    void SimulationWorld::BuildRenderSnapshot(SimSnapshot& outSnapshot)
+    {
+        BuildSnapshot(outSnapshot);
+    }
+
+    void SimulationWorld::SaveState(lacrima::BinaryWriter& writer) const
     {
         DT_PROFILE_SCOPE("SimulationWorld::SaveState");
+        writer.WritePrimitive<u64>(m_clock.TickIndex());
 
-        // 1. Clock
-        writer.WritePrimitive(m_clock.TickIndex());
+        m_entities.Serialize(writer);
+        m_transforms.Serialize(writer);
+        m_visuals.Serialize(writer);
+        m_sprites.Serialize(writer);
+        m_navAgents.Serialize(writer);
 
-        // 2. Entities
-        writer.WritePrimitive(static_cast<u32>(m_entities.LiveCount()));
-        
-        m_entities.ForEachValid([&](Entity ent)
-        {
-            writer.WritePrimitive(ent.index);
-            writer.WritePrimitive(ent.generation);
+        // Serialize LotGrids
+        u32 lotGridCount = 0;
+        const_cast<ComponentArray<Entity, LotGridComponent>&>(m_lotGrids).ForEach([&lotGridCount](Entity, const LotGridComponent&) {
+            ++lotGridCount;
+        });
+        writer.WritePrimitive<u32>(lotGridCount);
+        const_cast<ComponentArray<Entity, LotGridComponent>&>(m_lotGrids).ForEach([&writer](Entity ent, const LotGridComponent& lot) {
+            writer.WritePrimitive<Entity>(ent);
+            writer.WritePrimitive<u32>(lot.width);
+            writer.WritePrimitive<u32>(lot.height);
+            writer.WritePrimitive<f32>(lot.tileWidth);
+            writer.WritePrimitive<f32>(lot.tileHeight);
 
-            // Transform
-            if (const TransformComponent* tc = m_transforms.Get(ent))
-            {
-                writer.WritePrimitive<u8>(1);
-                writer.WriteObject(tc, TransformComponent::StaticTypeInfo());
-            }
-            else
-            {
-                writer.WritePrimitive<u8>(0);
-            }
+            u32 flagsCount = static_cast<u32>(lot.flags.size());
+            writer.WritePrimitive<u32>(flagsCount);
+            if (flagsCount > 0)
+                writer.WriteBytes(lot.flags.data(), flagsCount * sizeof(u8));
 
-            // Visual
-            if (const VisualComponent* vc = m_visuals.Get(ent))
-            {
-                writer.WritePrimitive<u8>(1);
-                writer.WriteObject(vc, VisualComponent::StaticTypeInfo());
-            }
-            else
-            {
-                writer.WritePrimitive<u8>(0);
-            }
+            u32 floorCount = static_cast<u32>(lot.floorTextureIds.size());
+            writer.WritePrimitive<u32>(floorCount);
+            if (floorCount > 0)
+                writer.WriteBytes(lot.floorTextureIds.data(), floorCount * sizeof(u16));
 
-            // Needs (raw array)
-            if (const NeedsComponent* nc = m_needs.Get(ent))
+            u32 roomCount = static_cast<u32>(lot.roomIds.size());
+            writer.WritePrimitive<u32>(roomCount);
+            if (roomCount > 0)
+                writer.WriteBytes(lot.roomIds.data(), roomCount * sizeof(u16));
+        });
+
+        // Serialize SpringArms
+        u32 springArmCount = 0;
+        const_cast<ComponentArray<Entity, SpringArmComponent>&>(m_springArms).ForEach([&springArmCount](Entity, const SpringArmComponent&) {
+            ++springArmCount;
+        });
+        writer.WritePrimitive<u32>(springArmCount);
+        const_cast<ComponentArray<Entity, SpringArmComponent>&>(m_springArms).ForEach([&writer](Entity ent, const SpringArmComponent& sa) {
+            writer.WritePrimitive<Entity>(ent);
+            writer.WritePrimitive<f32>(sa.targetArmLength);
+            writer.WritePrimitive<f32>(sa.currentArmLength);
+            writer.WritePrimitive<f32>(sa.minArmLength);
+            writer.WritePrimitive<f32>(sa.maxArmLength);
+            writer.WritePrimitive<f32>(sa.probeRadius);
+            writer.WritePrimitive<f32>(sa.collisionPadding);
+            writer.WritePrimitive<f32>(sa.targetPitch);
+            writer.WritePrimitive<f32>(sa.targetYaw);
+            writer.WritePrimitive<f32>(sa.currentPitch);
+            writer.WritePrimitive<f32>(sa.currentYaw);
+            writer.WritePrimitive<f32>(sa.cameraLagSpeed);
+            writer.WritePrimitive<bool>(sa.enableCameraLag);
+            writer.WritePrimitive<bool>(sa.doCollisionTest);
+            writer.WritePrimitive<f32>(sa.targetOffset.x);
+            writer.WritePrimitive<f32>(sa.targetOffset.y);
+            writer.WritePrimitive<f32>(sa.targetOffset.z);
+            writer.WritePrimitive<f32>(sa.computedCameraPosition.x);
+            writer.WritePrimitive<f32>(sa.computedCameraPosition.y);
+            writer.WritePrimitive<f32>(sa.computedCameraPosition.z);
+            writer.WritePrimitive<f32>(sa.computedLookAtTarget.x);
+            writer.WritePrimitive<f32>(sa.computedLookAtTarget.y);
+            writer.WritePrimitive<f32>(sa.computedLookAtTarget.z);
+        });
+
+        // Serialize RoutingSlots
+        u32 routingCount = 0;
+        const_cast<ComponentArray<Entity, RoutingSlotComponent>&>(m_routingSlots).ForEach([&routingCount](Entity, const RoutingSlotComponent&) {
+            ++routingCount;
+        });
+        writer.WritePrimitive<u32>(routingCount);
+        const_cast<ComponentArray<Entity, RoutingSlotComponent>&>(m_routingSlots).ForEach([&writer](Entity ent, const RoutingSlotComponent& comp) {
+            writer.WritePrimitive<Entity>(ent);
+            writer.WritePrimitive<i32>(comp.footprint.sizeX);
+            writer.WritePrimitive<i32>(comp.footprint.sizeY);
+
+            u32 slotCount = static_cast<u32>(comp.slots.size());
+            writer.WritePrimitive<u32>(slotCount);
+            for (const auto& s : comp.slots)
             {
-                writer.WritePrimitive<u8>(1);
-                for (usize i = 0; i < kNeedCount; ++i)
-                {
-                    writer.WritePrimitive(nc->values[i]);
-                }
+                writer.WritePrimitive<i32>(s.relativePos.x);
+                writer.WritePrimitive<i32>(s.relativePos.y);
+                writer.WritePrimitive<bool>(s.isReserved);
+                writer.WritePrimitive<Entity>(s.reservedBy);
             }
-            else
-            {
-                writer.WritePrimitive<u8>(0);
-            }
-            
-            // InteractionQueue is inherently transient runtime state.
-            // InteractableComponent is currently static (defined on creation).
-            // We skip saving them here and assume they are recreated on load.
         });
     }
 
-    bool SimulationWorld::LoadState(dt::BinaryReader& reader)
+    bool SimulationWorld::LoadState(lacrima::BinaryReader& reader)
     {
         DT_PROFILE_SCOPE("SimulationWorld::LoadState");
 
@@ -337,94 +319,133 @@ end
         u64 tickIndex = reader.ReadPrimitive<u64>();
         m_clock.Advance(tickIndex);
 
-        // Clear existing state before loading
-        m_entities = EntityAllocator();
-        m_transforms.Clear();
-        m_visuals.Clear();
-        m_needs.Clear();
+        if (!m_entities.Deserialize(reader)) return false;
+
         m_interactables.Clear();
-        m_queues.Clear();
-        m_navAgents.Clear();
+        m_lods.Clear();
 
-        u32 liveCount = reader.ReadPrimitive<u32>();
-        for (u32 i = 0; i < liveCount; ++i)
+        if (!m_transforms.Deserialize(reader)) return false;
+        if (!m_visuals.Deserialize(reader)) return false;
+        if (!m_sprites.Deserialize(reader)) return false;
+        if (!m_navAgents.Deserialize(reader)) return false;
+
+        m_entities.ForEachValid([this](Entity ent)
         {
-            u32 index = reader.ReadPrimitive<u32>();
-            u32 gen = reader.ReadPrimitive<u32>();
-            
-            // Reconstruct entity handle
-            // This requires EntityAllocator to support placing at a specific index,
-            // which it might not. For M13, we assume sequential saves or we just 
-            // call CreateEntity() and hope indices match.
-            // A more robust system would save a UUID map or add a RecreateEntity method.
-            Entity ent = m_entities.Create(); 
-            // For now, we trust the allocator gives us the same index since we just reset it.
-            
-            if (reader.ReadPrimitive<u8>() == 1)
-            {
-                TransformComponent& tc = m_transforms.Add(ent);
-                reader.ReadObject(&tc, TransformComponent::StaticTypeInfo());
-            }
+            m_interactables.Add(ent);
+            m_lods.Add(ent);
+        });
 
-            if (reader.ReadPrimitive<u8>() == 1)
+        // Load LotGrids
+        m_lotGrids.Clear();
+        if (!reader.AtEnd())
+        {
+            u32 lotGridCount = reader.ReadPrimitive<u32>();
+            for (u32 i = 0; i < lotGridCount; ++i)
             {
-                VisualComponent& vc = m_visuals.Add(ent);
-                reader.ReadObject(&vc, VisualComponent::StaticTypeInfo());
-            }
+                Entity ent = reader.ReadPrimitive<Entity>();
+                LotGridComponent& lot = m_lotGrids.Add(ent);
+                lot.width = reader.ReadPrimitive<u32>();
+                lot.height = reader.ReadPrimitive<u32>();
+                lot.tileWidth = reader.ReadPrimitive<f32>();
+                lot.tileHeight = reader.ReadPrimitive<f32>();
 
-            if (reader.ReadPrimitive<u8>() == 1)
+                u32 flagsCount = reader.ReadPrimitive<u32>();
+                lot.flags.resize(flagsCount);
+                if (flagsCount > 0)
+                    reader.ReadBytes(lot.flags.data(), flagsCount * sizeof(u8));
+
+                u32 floorCount = reader.ReadPrimitive<u32>();
+                lot.floorTextureIds.resize(floorCount);
+                if (floorCount > 0)
+                    reader.ReadBytes(lot.floorTextureIds.data(), floorCount * sizeof(u16));
+
+                u32 roomCount = reader.ReadPrimitive<u32>();
+                lot.roomIds.resize(roomCount);
+                if (roomCount > 0)
+                    reader.ReadBytes(lot.roomIds.data(), roomCount * sizeof(u16));
+            }
+        }
+
+        // Load SpringArms
+        m_springArms.Clear();
+        if (!reader.AtEnd())
+        {
+            u32 count = reader.ReadPrimitive<u32>();
+            for (u32 i = 0; i < count; ++i)
             {
-                NeedsComponent& nc = m_needs.Add(ent);
-                for (usize n = 0; n < kNeedCount; ++n)
+                Entity ent = reader.ReadPrimitive<Entity>();
+                SpringArmComponent& sa = m_springArms.Add(ent);
+                sa.targetArmLength = reader.ReadPrimitive<f32>();
+                sa.currentArmLength = reader.ReadPrimitive<f32>();
+                sa.minArmLength = reader.ReadPrimitive<f32>();
+                sa.maxArmLength = reader.ReadPrimitive<f32>();
+                sa.probeRadius = reader.ReadPrimitive<f32>();
+                sa.collisionPadding = reader.ReadPrimitive<f32>();
+                sa.targetPitch = reader.ReadPrimitive<f32>();
+                sa.targetYaw = reader.ReadPrimitive<f32>();
+                sa.currentPitch = reader.ReadPrimitive<f32>();
+                sa.currentYaw = reader.ReadPrimitive<f32>();
+                sa.cameraLagSpeed = reader.ReadPrimitive<f32>();
+                sa.enableCameraLag = reader.ReadPrimitive<bool>();
+                sa.doCollisionTest = reader.ReadPrimitive<bool>();
+                sa.targetOffset.x = reader.ReadPrimitive<f32>();
+                sa.targetOffset.y = reader.ReadPrimitive<f32>();
+                sa.targetOffset.z = reader.ReadPrimitive<f32>();
+                sa.computedCameraPosition.x = reader.ReadPrimitive<f32>();
+                sa.computedCameraPosition.y = reader.ReadPrimitive<f32>();
+                sa.computedCameraPosition.z = reader.ReadPrimitive<f32>();
+                sa.computedLookAtTarget.x = reader.ReadPrimitive<f32>();
+                sa.computedLookAtTarget.y = reader.ReadPrimitive<f32>();
+                sa.computedLookAtTarget.z = reader.ReadPrimitive<f32>();
+            }
+        }
+
+        // Load RoutingSlots
+        m_routingSlots.Clear();
+        if (!reader.AtEnd())
+        {
+            u32 routingCount = reader.ReadPrimitive<u32>();
+            for (u32 i = 0; i < routingCount; ++i)
+            {
+                Entity ent = reader.ReadPrimitive<Entity>();
+                RoutingSlotComponent& comp = m_routingSlots.Add(ent);
+                comp.footprint.sizeX = reader.ReadPrimitive<i32>();
+                comp.footprint.sizeY = reader.ReadPrimitive<i32>();
+
+                u32 slotCount = reader.ReadPrimitive<u32>();
+                comp.slots.resize(slotCount);
+                for (u32 s = 0; s < slotCount; ++s)
                 {
-                    nc.values[n] = reader.ReadPrimitive<f32>();
+                    comp.slots[s].relativePos.x = reader.ReadPrimitive<i32>();
+                    comp.slots[s].relativePos.y = reader.ReadPrimitive<i32>();
+                    comp.slots[s].isReserved = reader.ReadPrimitive<bool>();
+                    comp.slots[s].reservedBy = reader.ReadPrimitive<Entity>();
                 }
             }
-            
-            // Re-add un-serialized default components
-            m_interactables.Add(ent);
-            m_queues.Add(ent);
         }
 
-        return true;
-    }
-
-    void SimulationWorld::LoadBuiltinInteractionScripts()
-    {
-        const bool ok = m_scriptEngine.LoadString(kBuiltinInteractionScript, "builtin_interactions");
-        if (!ok)
-        {
-            DT_LOG_ERROR(LogCategory::Scripting, "SimulationWorld: failed to load built-in interaction scripts - Rest/GrabASnack will fail their Lua calls at runtime");
-        }
+        return !reader.HasError();
     }
 
     void SimulationWorld::BuildTickGraph()
     {
-        auto& timeNode = m_tickGraph.AddTask([this]() { StepTime(); }, "Time");
-
-        auto& needsNode = m_tickGraph.AddTask([this]() { StepNeeds(); }, "Needs");
-        needsNode.After(timeNode);
-
-        // [Relationship attaches here in a future milestone.]
-
-        auto& autonomyNode = m_tickGraph.AddTask([this]() { StepAutonomy(); }, "Autonomy");
-        autonomyNode.After(needsNode);
-
-        auto& resolveNode = m_tickGraph.AddTask([this]() { StepInteractionResolve(); }, "InteractionResolve");
-        resolveNode.After(autonomyNode);
-
-        auto& navigationNode = m_tickGraph.AddTask([this]() { StepNavigation(); }, "Navigation");
-        navigationNode.After(resolveNode);
-
-        auto& animationsNode = m_tickGraph.AddTask([this]() 
-        { 
-            dt::sim::AnimationSystem::StepAnimations(m_currentFixedDeltaSeconds, m_visuals); 
-        }, "Animations");
-        animationsNode.After(navigationNode);
-
+        auto& springArmNode = m_tickGraph.AddTask([this]() {
+            SpringArmSystem::Update(m_currentFixedDeltaSeconds, m_transforms, m_springArms, m_physicsSystem);
+        }, "SpringArm");
+        auto& lodNode = m_tickGraph.AddTask([this]() { m_lodSystem.Step(*this); }, "LOD");
+        lodNode.After(springArmNode);
+        auto& streamerNode = m_tickGraph.AddTask([this]() { m_worldStreamer.Step(*this); }, "WorldStreamer");
+        streamerNode.After(lodNode);
+        auto& vehicleNode = m_tickGraph.AddTask([this]() { VehicleSystem::Update(*this, m_currentFixedDeltaSeconds); }, "VehicleSystem");
+        vehicleNode.After(streamerNode);
+        auto& footIKNode = m_tickGraph.AddTask([this]() { FootIKSystem::Update(*this, m_currentFixedDeltaSeconds); }, "FootIKSystem");
+        footIKNode.After(vehicleNode);
         auto& snapshotNode = m_tickGraph.AddTask([this]() { BuildSnapshot(*m_currentOutSnapshot); }, "Snapshot");
-        snapshotNode.After(animationsNode);
+        snapshotNode.After(streamerNode);
+    }
 
+    void SimulationWorld::FinalizeTickGraph()
+    {
         m_tickGraph.Finalize();
     }
 
@@ -432,201 +453,102 @@ end
     {
         m_currentFixedDeltaSeconds = static_cast<f32>(fixedDeltaSeconds);
         m_currentOutSnapshot = &outSnapshot;
-        m_pendingTickIndex = tickIndex;
 
-        JobSystem::Get().RunGraph(m_tickGraph);
+        m_tickGraph.Reset();
+        lacrima::JobSystem::Get().RunGraph(m_tickGraph);
+        m_clock.Advance(tickIndex);
     }
 
     SimTickFunc SimulationWorld::MakeTickFunc()
     {
-        return [this](u64 tickIndex, f64 fixedDeltaSeconds, SimSnapshot& outSnapshot)
+        return [this](u64 tickIndex, f64 dt, SimSnapshot& snapshot)
         {
-            Tick(tickIndex, fixedDeltaSeconds, outSnapshot);
+            Tick(tickIndex, dt, snapshot);
         };
     }
 
-    void SimulationWorld::StepTime()
-    {
-        m_clock.Advance(m_pendingTickIndex);
-    }
-
-    void SimulationWorld::StepNeeds()
-    {
-        m_needs.ForEach([&](Entity /*entity*/, NeedsComponent& needs)
-        {
-            DecayNeeds(needs, m_needDefinitions, m_currentFixedDeltaSeconds);
-        });
-    }
-
-    void SimulationWorld::StepAutonomy()
-    {
-        std::vector<AutonomyCandidate> globalCandidates = m_globalInteractions.BuildCandidates();
-
-        // Satisfaction weighting for scoring (fast C++ path, see
-        // AutonomySystem.h rationale for why scoring itself stays
-        // Lua-free) - kept as a small name-keyed lookup here, same
-        // caveat still applies (real content pipeline
-        // would carry this alongside InteractionDef via .asset data).
-        for (AutonomyCandidate& candidate : globalCandidates)
-        {
-            if (candidate.def->name == "Rest")
-            {
-                candidate.satisfies = { { NeedId::Energy, kRestSatisfactionWeight } };
-            }
-            else if (candidate.def->name == "GrabASnack")
-            {
-                candidate.satisfies = { { NeedId::Hunger, kSnackSatisfactionWeight } };
-            }
-        }
-
-        m_entities.ForEachValid([&](Entity entity)
-        {
-            InteractionQueue* queue = m_queues.Get(entity);
-            NeedsComponent* needs = m_needs.Get(entity);
-            if (queue == nullptr || needs == nullptr || !queue->IsEmpty())
-            {
-                return;
-            }
-
-            // Real Lua check-function gating: filter candidates down to
-            // only those whose luaCheckFunction currently returns true,
-            // BEFORE scoring. A candidate whose check function is missing
-            // or errors is excluded (fails safe - never offered) rather
-            // than assumed available.
-            // Get nearby objects if this entity has a transform
-            std::vector<Entity> nearbyObjects;
-            if (const TransformComponent* transform = m_transforms.Get(entity))
-            {
-                nearbyObjects = SpatialSystem::FindInteractablesInRange(*transform, 10.0f, m_transforms, m_interactables);
-            }
-
-            // Combine global and local candidates
-            std::vector<AutonomyCandidate> allCandidates = globalCandidates;
-
-            for (Entity objEntity : nearbyObjects)
-            {
-                if (const InteractableComponent* interactable = m_interactables.Get(objEntity))
-                {
-                    for (const InteractionDef& def : interactable->interactions.All())
-                    {
-                        AutonomyCandidate candidate;
-                        candidate.def = &def;
-                        candidate.target = objEntity;
-                        
-                        // Just like global interactions, set satisfactions here if needed.
-                        // In a real system, these come from data (.asset).
-                        // For Milestone 9, we hardcode some mock satisfactions for objects.
-                        if (def.name == "Rest")
-                        {
-                            candidate.satisfies = { { NeedId::Energy, kRestSatisfactionWeight } };
-                        }
-                        else if (def.name == "GrabASnack")
-                        {
-                            candidate.satisfies = { { NeedId::Hunger, kSnackSatisfactionWeight } };
-                        }
-                        
-                        allCandidates.push_back(candidate);
-                    }
-                }
-            }
-
-            std::vector<AutonomyCandidate> availableCandidates;
-            availableCandidates.reserve(allCandidates.size());
-
-            for (AutonomyCandidate candidate : allCandidates)
-            {
-                // Global candidates target self, object candidates target the object.
-                if (candidate.target.generation == 0) // Meaning it wasn't set to an object
-                {
-                    candidate.target = entity;
-                }
-
-                std::optional<bool> checkResult = m_scriptEngine.CallGlobalFunction<bool>(
-                    candidate.def->luaCheckFunction, entity, candidate.target);
-
-                if (checkResult.has_value() && checkResult.value())
-                {
-                    availableCandidates.push_back(candidate);
-                }
-            }
-
-            const AutonomyCandidate* best = SelectBestCandidate(*needs, m_needDefinitions, availableCandidates);
-            if (best != nullptr && best->def != nullptr)
-            {
-                queue->PushAutonomous(*best->def, entity);
-            }
-        });
-    }
-
-    void SimulationWorld::StepInteractionResolve()
-    {
-        m_entities.ForEachValid([&](Entity entity)
-        {
-            InteractionQueue* queue = m_queues.Get(entity);
-            if (queue == nullptr || queue->IsEmpty())
-            {
-                return;
-            }
-
-            // Real Lua coroutine execution - see InteractionQueue::StepFront
-            // and ScriptCoroutine.h. Result is intentionally unused here;
-            // StepFront already handles popping the queue on
-            // Complete/Failed internally, so there is nothing further for
-            // this call site to do with the returned status other than let
-            // it happen. A future milestone (e.g. an on-interaction-failed
-            // reaction system) would consume this return value.
-            (void)queue->StepFront(m_scriptEngine, entity, m_currentFixedDeltaSeconds);
-        });
-    }
-
-    void SimulationWorld::StepNavigation()
-    {
-        m_navigationSystem.StepNavigation(this, m_currentFixedDeltaSeconds);
-    }
+    void SimulationWorld::StepTime() { }
+    void SimulationWorld::StepNavigation() { }
 
     void SimulationWorld::BuildSnapshot(SimSnapshot& outSnapshot)
     {
+        DT_PROFILE_SCOPE("SimulationWorld::BuildSnapshot");
+
         outSnapshot.proxies.clear();
-        outSnapshot.proxies.reserve(m_entities.LiveCount());
+        outSnapshot.raycastColumns.clear();
 
-        m_entities.ForEachValid([this, &outSnapshot](Entity e)
+        m_transforms.ForEach([this, &outSnapshot](Entity entity, TransformComponent& transform)
         {
-            RenderProxy proxy;
-            proxy.entityId = (static_cast<u64>(e.index) << 32) | e.generation;
-            
-            if (TransformComponent* transform = m_transforms.Get(e))
+            VisualComponent* visual = m_visuals.Get(entity);
+            if (visual != nullptr)
             {
-                proxy.positionX = transform->x;
-                proxy.positionY = transform->y;
-                proxy.positionZ = transform->z;
-                proxy.rotationY = transform->yaw;
-            }
-            else
-            {
-                proxy.positionX = 0.0f;
-                proxy.positionY = 0.0f;
-                proxy.positionZ = 0.0f;
-                proxy.rotationY = 0.0f;
-            }
-            
-            if (VisualComponent* visual = m_visuals.Get(e))
-            {
+                RenderProxy proxy;
+                proxy.positionX = transform.x;
+                proxy.positionY = transform.y;
+                proxy.positionZ = transform.z;
+                proxy.scaleX = 1.0f;
+                proxy.scaleY = 1.0f;
                 proxy.visualId = visual->visualId;
-                proxy.animationState = static_cast<u32>(visual->currentState);
-                proxy.currentFrame = visual->currentFrame;
+                outSnapshot.proxies.push_back(proxy);
             }
-            else
+            
+            Sprite2DComponent* sprite = m_sprites.Get(entity);
+            if (sprite != nullptr)
             {
-                proxy.visualId = 1;
-                if (!m_needs.Get(e))
-                {
-                    proxy.visualId = 2; // e.g. Object fallback
-                }
-                proxy.animationState = 0;
-                proxy.currentFrame = 0.0f;
+                RenderProxy proxy;
+                proxy.positionX = transform.x;
+                proxy.positionY = transform.y;
+                proxy.positionZ = transform.z;
+                proxy.scaleX = sprite->width;
+                proxy.scaleY = sprite->height;
+                proxy.visualId = sprite->textureAsset;
+                
+                proxy.spriteU = sprite->uv.u;
+                proxy.spriteV = sprite->uv.v;
+                proxy.spriteWidth = sprite->uv.width;
+                proxy.spriteHeight = sprite->uv.height;
+                proxy.spriteTintR = sprite->tintR;
+                proxy.spriteTintG = sprite->tintG;
+                proxy.spriteTintB = sprite->tintB;
+                proxy.spriteTintA = sprite->tintA;
+                
+                outSnapshot.proxies.push_back(proxy);
             }
-
-            outSnapshot.proxies.push_back(proxy);
         });
     }
+    bool SimulationWorld::SaveToFile(const std::string& path) const
+    {
+        lacrima::BinaryWriter writer;
+        SaveState(writer);
+        
+        std::ofstream out(path, std::ios::binary);
+        if (!out) return false;
+        const auto& data = writer.Data();
+        out.write(reinterpret_cast<const char*>(data.data()), data.size());
+        return true;
+    }
+
+    bool SimulationWorld::LoadFromFile(const std::string& path)
+    {
+        std::ifstream in(path, std::ios::binary | std::ios::ate);
+        if (!in) return false;
+        
+        std::streamsize size = in.tellg();
+        in.seekg(0, std::ios::beg);
+        
+        std::vector<u8> data(size);
+        if (in.read(reinterpret_cast<char*>(data.data()), size))
+        {
+            lacrima::BinaryReader reader(data);
+            return LoadState(reader);
+        }
+        return false;
+    }
 }
+
+
+
+
+
+
+

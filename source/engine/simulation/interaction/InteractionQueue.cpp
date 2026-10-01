@@ -1,15 +1,17 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "simulation/interaction/InteractionQueue.h"
 #include "scripting/ScriptCoroutine.h"
 #include "scripting/ScriptEngine.h"
+#include <cstdio>
 
-namespace dt::sim
+namespace lacrima::sim
 {
     void InteractionTable::Register(InteractionDef def)
     {
         m_interactions.push_back(std::move(def));
     }
 
-    const InteractionDef* InteractionTable::Find(const std::string& name) const
+    const InteractionDef* InteractionTable::Find(lacrima::StringID name) const
     {
         for (const InteractionDef& def : m_interactions)
         {
@@ -103,3 +105,4 @@ namespace dt::sim
         return result;
     }
 }
+

@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -24,7 +25,7 @@
 // place rather than each module recomputing calendar math independently.
 // ---------------------------------------------------------------------------
 
-namespace dt::sim
+namespace lacrima::sim
 {
     // How many fixed ticks make up one in-game minute. At kFixedTickSeconds
     // = 0.016s (~62.5 ticks/sec real-time) and kTicksPerGameMinute = 25,
@@ -76,3 +77,4 @@ namespace dt::sim
         CalendarTime m_calendar;
     };
 }
+

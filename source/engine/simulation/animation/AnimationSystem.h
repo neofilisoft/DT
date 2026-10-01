@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/platform/Types.h"
@@ -5,7 +6,7 @@
 #include "runtime/Entity.h"
 #include "simulation/animation/VisualComponent.h"
 
-namespace dt::sim
+namespace lacrima::sim
 {
     class AnimationSystem
     {
@@ -19,3 +20,4 @@ namespace dt::sim
         static void SetupSpriteAnimation(VisualComponent& visual, AnimationState state);
     };
 }
+

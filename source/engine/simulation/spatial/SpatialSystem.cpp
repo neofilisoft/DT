@@ -1,6 +1,7 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "simulation/spatial/SpatialSystem.h"
 
-namespace dt::sim
+namespace lacrima::sim
 {
     f32 SpatialSystem::DistanceSq(const TransformComponent& a, const TransformComponent& b)
     {
@@ -35,3 +36,4 @@ namespace dt::sim
         return result;
     }
 }
+

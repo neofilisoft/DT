@@ -1,11 +1,13 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "NavMesh.h"
 #include <DetourNavMesh.h>
 #include <DetourNavMeshQuery.h>
 #include <DetourNavMeshBuilder.h>
 #include "core/platform/Assert.h"
+#include "core/logging/Logger.h"
 #include <utility>
 
-namespace dt::sim
+namespace lacrima::sim
 {
     NavMesh::NavMesh() = default;
 
@@ -64,7 +66,7 @@ namespace dt::sim
 
     bool NavMesh::CreateTestNavMesh()
     {
-        std::printf("CreateTestNavMesh: Start\n"); std::fflush(stdout);
+        LACRIMA_LOG_TRACE(LogCategory::Simulation, "NavMesh::CreateTestNavMesh: building test mesh");
         // Creates a simple 1-polygon navmesh for testing (a 100x100 square)
         dtNavMeshCreateParams params{};
         
@@ -116,14 +118,14 @@ namespace dt::sim
         unsigned char* navData = nullptr;
         int navDataSize = 0;
 
-        std::printf("CreateTestNavMesh: Calling dtCreateNavMeshData\n"); std::fflush(stdout);
+        
         if (!dtCreateNavMeshData(&params, &navData, &navDataSize))
         {
-            std::printf("CreateTestNavMesh: dtCreateNavMeshData failed\n"); std::fflush(stdout);
+            LACRIMA_LOG_ERROR(LogCategory::Simulation, "NavMesh::CreateTestNavMesh: dtCreateNavMeshData failed");
             return false;
         }
 
-        std::printf("CreateTestNavMesh: Allocating mesh\n"); std::fflush(stdout);
+        
         dtNavMesh* mesh = dtAllocNavMesh();
         if (!mesh)
         {
@@ -131,17 +133,17 @@ namespace dt::sim
             return false;
         }
 
-        std::printf("CreateTestNavMesh: Calling init\n"); std::fflush(stdout);
+        
         dtStatus status = mesh->init(navData, navDataSize, DT_TILE_FREE_DATA);
         if (dtStatusFailed(status))
         {
-            std::printf("CreateTestNavMesh: init failed\n"); std::fflush(stdout);
+            LACRIMA_LOG_ERROR(LogCategory::Simulation, "NavMesh::CreateTestNavMesh: dtNavMesh init failed");
             dtFree(navData);
             dtFreeNavMesh(mesh);
             return false;
         }
 
-        std::printf("CreateTestNavMesh: InitializeFromDetour\n"); std::fflush(stdout);
+        LACRIMA_LOG_TRACE(LogCategory::Simulation, "NavMesh::CreateTestNavMesh: calling InitializeFromDetour");
         return InitializeFromDetour(mesh);
     }
 
@@ -202,6 +204,49 @@ namespace dt::sim
         return path;
     }
 
+    bool NavMesh::Raycast(const Vec3& start, const Vec3& end, Vec3& outHitPosition) const
+    {
+        if (!m_navQuery) return false;
+
+        dtQueryFilter filter;
+        filter.setIncludeFlags(0xffff);
+        filter.setExcludeFlags(0);
+
+        float startPos[3] = { start.x, start.y, start.z };
+        float endPos[3] = { end.x, end.y, end.z };
+        float extents[3] = { 2.0f, 4.0f, 2.0f };
+
+        dtPolyRef startRef = 0;
+        float startPt[3];
+        m_navQuery->findNearestPoly(startPos, extents, &filter, &startRef, startPt);
+
+        if (!startRef)
+        {
+            return true; // Assume blocked if we can't even find a start poly
+        }
+
+        float t = 0;
+        float hitNormal[3];
+        dtPolyRef pathPolys[256];
+        int pathCount = 0;
+
+        dtStatus status = m_navQuery->raycast(startRef, startPos, endPos, &filter, &t, hitNormal, pathPolys, &pathCount, 256);
+        
+        if (dtStatusSucceed(status))
+        {
+            // If t < 1.0f, we hit a wall/boundary
+            if (t < 1.0f)
+            {
+                outHitPosition.x = startPos[0] + (endPos[0] - startPos[0]) * t;
+                outHitPosition.y = startPos[1] + (endPos[1] - startPos[1]) * t;
+                outHitPosition.z = startPos[2] + (endPos[2] - startPos[2]) * t;
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
     bool NavMesh::FindNearestPoint(const Vec3& point, const Vec3& searchExtents, Vec3& outNearest) const
     {
         if (!m_navQuery) return false;
@@ -225,3 +270,6 @@ namespace dt::sim
         return false;
     }
 }
+
+
+

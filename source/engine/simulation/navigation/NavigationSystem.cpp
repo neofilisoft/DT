@@ -1,8 +1,9 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #include "NavigationSystem.h"
 #include "simulation/world/SimulationWorld.h"
 #include <cmath>
 
-namespace dt::sim
+namespace lacrima::sim
 {
     void NavigationSystem::Initialize(SimulationWorld* world)
     {
@@ -17,6 +18,11 @@ namespace dt::sim
     std::vector<Vec3> NavigationSystem::FindPath(const Vec3& start, const Vec3& end) const
     {
         return m_navMesh.FindPath(start, end);
+    }
+
+    bool NavigationSystem::Raycast(const lacrima::Vec3& start, const lacrima::Vec3& end, lacrima::Vec3& outHitPosition) const
+    {
+        return m_navMesh.Raycast(start, end, outHitPosition);
     }
 
     void NavigationSystem::StepNavigation(SimulationWorld* world, float dt)
@@ -70,3 +76,4 @@ namespace dt::sim
         });
     }
 }
+

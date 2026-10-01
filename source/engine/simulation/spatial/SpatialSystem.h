@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/containers/ComponentArray.h"
@@ -8,14 +9,14 @@
 
 #include <vector>
 
-namespace dt::sim
+namespace lacrima::sim
 {
     class SpatialSystem
     {
     public:
         // Returns a list of all Entities that have an InteractableComponent and are within
         // `radius` distance of the `center` position.
-        // This is a naive O(N) search for Milestone 9. Future milestones will replace this
+        // This is a naive O(N) search. Future implementations will replace this
         // with a spatial partition structure (QuadTree / Spatial Hashing).
         static std::vector<Entity> FindInteractablesInRange(
             const TransformComponent& center,
@@ -28,3 +29,4 @@ namespace dt::sim
         static f32 DistanceSq(const TransformComponent& a, const TransformComponent& b);
     };
 }
+

@@ -1,3 +1,4 @@
+// Copyright Neofilisoft. All Rights Reserved.
 #pragma once
 
 #include "core/math/Math.h"
@@ -6,7 +7,7 @@
 class dtNavMesh;
 class dtNavMeshQuery;
 
-namespace dt::sim
+namespace lacrima::sim
 {
     /**
      * @brief Wrapper around Detour navigation mesh and query.
@@ -42,6 +43,12 @@ namespace dt::sim
         std::vector<Vec3> FindPath(const Vec3& start, const Vec3& end) const;
 
         /**
+         * @brief Casts a ray on the navmesh from start to end.
+         * @return True if the ray hit a wall/boundary (line of sight is blocked), false if the path is clear.
+         */
+        bool Raycast(const Vec3& start, const Vec3& end, Vec3& outHitPosition) const;
+
+        /**
          * @brief Snaps a point to the nearest valid point on the navmesh.
          */
         bool FindNearestPoint(const Vec3& point, const Vec3& searchExtents, Vec3& outNearest) const;
@@ -54,3 +61,4 @@ namespace dt::sim
         dtNavMeshQuery* m_navQuery = nullptr;
     };
 }
+
