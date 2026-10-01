@@ -1,4 +1,5 @@
-﻿#include "editor/scene/SceneOutliner.h"
+// Copyright Neofilisoft. All Rights Reserved.
+#include "editor/scene/SceneOutliner.h"
 #include "editor/core/EditorContext.h"
 #include "simulation/world/SimulationWorld.h"
 
@@ -6,7 +7,7 @@
 #include <cstring>
 #include <string>
 
-namespace dt::editor
+namespace lacrima::editor
 {
     void SceneOutliner::Init(EditorContext& ctx)
     {
@@ -16,14 +17,14 @@ namespace dt::editor
 
     void SceneOutliner::Construct(EditorContext& ctx)
     {
-        ImGui::Begin("Scene Outliner", &m_isOpen);
+        ImGui::Begin("Outliner", &m_isOpen);
 
         // Search filter
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::InputTextWithHint("##search", "Search entities...", m_searchBuf, sizeof(m_searchBuf));
         ImGui::Separator();
 
-        dt::sim::SimulationWorld* world = ctx.World();
+        lacrima::sim::SimulationWorld* world = ctx.World();
         if (!world)
         {
             ImGui::TextDisabled("No world loaded.");
@@ -40,7 +41,7 @@ namespace dt::editor
         // We use Transforms as the canonical source of entity identity - every
         // entity has a transform in this engine.
         std::string searchStr = m_searchBuf;
-        world->Transforms().ForEach([&](dt::Entity entity, auto& /*transform*/)
+        world->Transforms().ForEach([&](lacrima::Entity entity, auto& /*transform*/)
         {
             std::string label = "Entity #" + std::to_string(entity.index);
 
@@ -54,7 +55,7 @@ namespace dt::editor
         ImGui::End();
     }
 
-    void SceneOutliner::DrawEntityRow(EditorContext& ctx, dt::Entity entity, const std::string& label)
+    void SceneOutliner::DrawEntityRow(EditorContext& ctx, lacrima::Entity entity, const std::string& label)
     {
         bool isSelected = (ctx.SelectedEntity() == entity);
 
@@ -80,3 +81,5 @@ namespace dt::editor
         }
     }
 }
+
+

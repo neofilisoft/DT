@@ -1,16 +1,9 @@
-﻿#pragma once
-// ---------------------------------------------------------------------------
-// editor/scene/ViewportPanel.h
-//
-// The main 3D editing viewport. Renders the engine scene into an ImGui image
-// and provides ImGuizmo gizmos for translating/rotating/scaling the selected
-// entity. Inspired by Lacrima SimulationUI::constructImGuizmo().
-// ---------------------------------------------------------------------------
+#pragma once
 
 #include "editor/core/EditorPanel.h"
 #include <ImGuizmo.h>
 
-namespace dt::editor
+namespace lacrima::editor
 {
     enum class GizmoMode
     {
@@ -30,11 +23,9 @@ namespace dt::editor
 
     private:
         void DrawToolbar(EditorContext& ctx);
-        void DrawGizmo(EditorContext& ctx);
+        void DrawGizmo(EditorContext& ctx, const float* viewMatrix, const float* projMatrix);
 
         GizmoMode           m_gizmoMode   = GizmoMode::Translate;
         bool                m_localSpace  = true;
-        float               m_viewMatrix[16]  = {};
-        float               m_projMatrix[16]  = {};
     };
 }

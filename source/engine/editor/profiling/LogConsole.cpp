@@ -1,17 +1,18 @@
-﻿#include "editor/profiling/LogConsole.h"
+// Copyright Neofilisoft. All Rights Reserved.
+#include "editor/profiling/LogConsole.h"
 #include "editor/core/EditorContext.h"
 
 #include <imgui.h>
 #include <cstring>
 #include <memory>
 
-namespace dt::editor
+namespace lacrima::editor
 {
-    class ProxySink : public dt::ILogSink
+    class ProxySink : public lacrima::ILogSink
     {
     public:
         ProxySink(LogConsole* console) : m_console(console) {}
-        void Write(const dt::LogMessage& message) override {
+        void Write(const lacrima::LogMessage& message) override {
             if (m_console) m_console->Write(message);
         }
         void Detach() { m_console = nullptr; }
@@ -22,7 +23,7 @@ namespace dt::editor
     static ProxySink* s_proxySink = nullptr;
 
     LogConsole::LogConsole()
-        : EditorPanel("Log Console")
+        : EditorPanel("Console")
     {
     }
 
@@ -31,7 +32,7 @@ namespace dt::editor
         (void)ctx;
         auto proxy = std::make_unique<ProxySink>(this);
         s_proxySink = proxy.get();
-        dt::Logger::Get().AddSink(std::move(proxy));
+        lacrima::Logger::Get().AddSink(std::move(proxy));
     }
 
     void LogConsole::Shutdown()
@@ -39,7 +40,7 @@ namespace dt::editor
         if (s_proxySink) s_proxySink->Detach();
     }
 
-    void LogConsole::Write(const dt::LogMessage& message)
+    void LogConsole::Write(const lacrima::LogMessage& message)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_entries.push_back({ message.text, message.level });
@@ -50,7 +51,7 @@ namespace dt::editor
     void LogConsole::Construct(EditorContext& ctx)
     {
         (void)ctx;
-        ImGui::Begin("Log Console", &m_isOpen);
+        ImGui::Begin("Console", &m_isOpen);
 
         // Toolbar
         ImGui::Checkbox("Info",  &m_showInfo);  ImGui::SameLine();
@@ -77,16 +78,16 @@ namespace dt::editor
             std::lock_guard<std::mutex> lock(m_mutex);
             for (const auto& entry : m_entries)
             {
-                if (!m_showInfo  && entry.level == dt::LogLevel::Info)  continue;
-                if (!m_showWarn  && entry.level == dt::LogLevel::Warning) continue;
-                if (!m_showError && entry.level == dt::LogLevel::Error) continue;
+                if (!m_showInfo  && entry.level == lacrima::LogLevel::Info)  continue;
+                if (!m_showWarn  && entry.level == lacrima::LogLevel::Warning) continue;
+                if (!m_showError && entry.level == lacrima::LogLevel::Error) continue;
                 if (!filterStr.empty() && entry.text.find(filterStr) == std::string::npos) continue;
 
                 ImVec4 color;
                 switch (entry.level)
                 {
-                    case dt::LogLevel::Warning: color = ImVec4(1.0f, 0.9f, 0.1f, 1.0f); break;
-                    case dt::LogLevel::Error:   color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); break;
+                    case lacrima::LogLevel::Warning: color = ImVec4(1.0f, 0.9f, 0.1f, 1.0f); break;
+                    case lacrima::LogLevel::Error:   color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); break;
                     default:                color = ImVec4(0.9f, 0.9f, 0.9f, 1.0f); break;
                 }
                 ImGui::TextColored(color, "%s", entry.text.c_str());
@@ -100,3 +101,5 @@ namespace dt::editor
         ImGui::End();
     }
 }
+
+

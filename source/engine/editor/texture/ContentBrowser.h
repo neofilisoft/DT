@@ -1,4 +1,5 @@
-﻿#pragma once
+// Copyright Neofilisoft. All Rights Reserved.
+#pragma once
 // ---------------------------------------------------------------------------
 // editor/texture/ContentBrowser.h (lives in texture/ folder per user layout)
 //
@@ -12,7 +13,7 @@
 #include <vector>
 #include <filesystem>
 
-namespace dt::editor
+namespace lacrima::editor
 {
     struct ContentEntry
     {
@@ -30,9 +31,11 @@ namespace dt::editor
         void Init(EditorContext& ctx) override;
         void Construct(EditorContext& ctx) override;
 
-    private:
         void NavigateTo(const std::filesystem::path& dir);
+        void SetRootPath(const std::filesystem::path& dir);
         void RefreshEntries();
+
+    private:
         void DrawBreadcrumb();
         void DrawEntry(EditorContext& ctx, const ContentEntry& entry);
 
@@ -44,3 +47,4 @@ namespace dt::editor
         float m_iconSize = 72.0f;
     };
 }
+

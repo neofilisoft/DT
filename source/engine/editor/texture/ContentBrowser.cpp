@@ -1,11 +1,13 @@
-﻿#include "editor/texture/ContentBrowser.h"
+// Copyright Neofilisoft. All Rights Reserved.
+#include "editor/texture/ContentBrowser.h"
+#include "core/filesystem/FileSystem.h"
 #include "editor/core/EditorContext.h"
 
 #include <imgui.h>
 #include <algorithm>
 #include <cstring>
 
-namespace dt::editor
+namespace lacrima::editor
 {
     ContentBrowser::ContentBrowser()
         : EditorPanel("Content Browser")
@@ -15,12 +17,31 @@ namespace dt::editor
     void ContentBrowser::Init(EditorContext& ctx)
     {
         (void)ctx;
-        // Default root is the source/engine/asset folder relative to the binary.
-        m_rootPath = std::filesystem::current_path() / "source" / "engine" / "asset";
-        if (!std::filesystem::exists(m_rootPath))
+        std::string assetDir = FileSystem::GetEngineAssetDir();
+        if (!assetDir.empty() && std::filesystem::exists(assetDir))
+        {
+            m_rootPath = assetDir;
+        }
+        else if (!FileSystem::Get().GetContentRoot().empty() && std::filesystem::exists(FileSystem::Get().GetContentRoot()))
+        {
+            m_rootPath = FileSystem::Get().GetContentRoot();
+        }
+        else if (std::filesystem::exists(std::filesystem::current_path() / "assets"))
+        {
+            m_rootPath = std::filesystem::current_path() / "assets";
+        }
+        else
+        {
             m_rootPath = std::filesystem::current_path();
+        }
 
         NavigateTo(m_rootPath);
+    }
+
+    void ContentBrowser::SetRootPath(const std::filesystem::path& dir)
+    {
+        m_rootPath = dir;
+        NavigateTo(dir);
     }
 
     void ContentBrowser::NavigateTo(const std::filesystem::path& dir)
@@ -76,7 +97,9 @@ namespace dt::editor
 
         // Icon grid
         float panelWidth = ImGui::GetContentRegionAvail().x;
-        int   columns    = std::max(1, static_cast<int>(panelWidth / (m_iconSize + 16.0f)));
+        float itemWidth  = (m_iconSize > 16.0f) ? (m_iconSize + 16.0f) : 88.0f;
+        int   columns    = (panelWidth > itemWidth) ? static_cast<int>(panelWidth / itemWidth) : 1;
+        if (columns < 1) columns = 1;
 
         if (ImGui::BeginTable("##content", columns))
         {
@@ -142,9 +165,22 @@ namespace dt::editor
             }
         }
 
+        // Drag & Drop Source
+        if (!entry.isDirectory)
+        {
+            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+            {
+                std::string pathStr = entry.fullPath.string();
+                ImGui::SetDragDropPayload("DND_ASSET_GLB", pathStr.c_str(), pathStr.size() + 1); // We can just use one payload name for simplicity or differentiate.
+                ImGui::Text("Dragging %s", entry.name.c_str());
+                ImGui::EndDragDropSource();
+            }
+        }
+
         // Label below icon
         ImGui::TextWrapped("%s", entry.name.c_str());
 
         ImGui::PopID();
     }
 }
+

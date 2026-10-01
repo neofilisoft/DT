@@ -1,4 +1,5 @@
-﻿#pragma once
+// Copyright Neofilisoft. All Rights Reserved.
+#pragma once
 // ---------------------------------------------------------------------------
 // editor/scene/SceneOutliner.h
 //
@@ -10,7 +11,7 @@
 #include "editor/core/EditorPanel.h"
 #include "runtime/Entity.h"
 
-namespace dt::editor
+namespace lacrima::editor
 {
     class SceneOutliner final : public EditorPanel
     {
@@ -21,8 +22,10 @@ namespace dt::editor
         void Construct(EditorContext& ctx) override;
 
     private:
-        void DrawEntityRow(EditorContext& ctx, dt::Entity entity, const std::string& label);
+        void DrawEntityRow(EditorContext& ctx, lacrima::Entity entity, const std::string& label);
 
         char m_searchBuf[128] = {};
     };
 }
+
+

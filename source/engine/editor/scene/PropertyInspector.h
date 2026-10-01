@@ -1,4 +1,5 @@
-﻿#pragma once
+// Copyright Neofilisoft. All Rights Reserved.
+#pragma once
 // ---------------------------------------------------------------------------
 // editor/scene/PropertyInspector.h
 //
@@ -11,7 +12,7 @@
 
 #include "editor/core/EditorPanel.h"
 
-namespace dt::editor
+namespace lacrima::editor
 {
     class PropertyInspector final : public EditorPanel
     {
@@ -22,8 +23,10 @@ namespace dt::editor
 
     private:
         void DrawTransformSection(EditorContext& ctx);
-        void DrawNeedsSection(EditorContext& ctx);
+
         void DrawNavAgentSection(EditorContext& ctx);
-        void DrawInteractionQueueSection(EditorContext& ctx);
+
     };
 }
+
+

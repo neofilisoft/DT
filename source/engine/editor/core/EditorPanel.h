@@ -1,4 +1,5 @@
-﻿#pragma once
+// Copyright Neofilisoft. All Rights Reserved.
+#pragma once
 // ---------------------------------------------------------------------------
 // editor/core/EditorPanel.h
 //
@@ -9,7 +10,7 @@
 
 #include <string>
 
-namespace dt::editor
+namespace lacrima::editor
 {
     class EditorContext;
 
@@ -39,3 +40,4 @@ namespace dt::editor
         bool        m_isOpen = true;
     };
 }
+

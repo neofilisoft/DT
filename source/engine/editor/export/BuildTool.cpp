@@ -1,4 +1,6 @@
-﻿#include "editor/export/BuildTool.h"
+// Copyright Neofilisoft. All Rights Reserved.
+#include "editor/export/BuildTool.h"
+#include "core/filesystem/FileSystem.h"
 #include "editor/core/EditorContext.h"
 #include "core/logging/Logger.h"
 
@@ -9,7 +11,7 @@
 #include <array>
 #include <cstdio>
 
-namespace dt::editor
+namespace lacrima::editor
 {
     static std::string ExecCapture(const std::string& cmd)
     {
@@ -71,7 +73,7 @@ namespace dt::editor
         auto log = [this](const std::string& msg)
         {
             m_buildLog.push_back(msg);
-            DT_LOG_INFO(LogCategory::Core, "[BuildTool] {}", msg);
+            LACRIMA_LOG_INFO(LogCategory::Core, "[BuildTool] {}", msg);
         };
 
         log("Build started.");
@@ -81,7 +83,11 @@ namespace dt::editor
         {
             log("[Cook] Scanning for source assets...");
             namespace fs = std::filesystem;
-            std::filesystem::path assetDir = std::filesystem::path(m_config.projectRoot) / "source" / "engine" / "asset";
+            std::filesystem::path assetDir = std::filesystem::path(m_config.projectRoot) / "assets";
+            if (!std::filesystem::exists(assetDir))
+            {
+                assetDir = FileSystem::GetEngineAssetDir();
+            }
 
             if (std::filesystem::exists(assetDir))
             {
@@ -222,3 +228,5 @@ namespace dt::editor
         ImGui::End();
     }
 }
+
+

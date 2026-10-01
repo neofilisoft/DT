@@ -1,4 +1,5 @@
-﻿#pragma once
+// Copyright Neofilisoft. All Rights Reserved.
+#pragma once
 // ---------------------------------------------------------------------------
 // editor/profiling/LogConsole.h
 //
@@ -13,15 +14,15 @@
 #include <vector>
 #include <mutex>
 
-namespace dt::editor
+namespace lacrima::editor
 {
     struct LogEntry
     {
         std::string    text;
-        dt::LogLevel   level = dt::LogLevel::Info;
+        lacrima::LogLevel   level = lacrima::LogLevel::Info;
     };
 
-    class LogConsole final : public EditorPanel, public dt::ILogSink
+    class LogConsole final : public EditorPanel, public lacrima::ILogSink
     {
     public:
         LogConsole();
@@ -30,8 +31,8 @@ namespace dt::editor
         void Construct(EditorContext& ctx) override;
         void Shutdown() override;
 
-        // dt::ILogSink
-        void Write(const dt::LogMessage& message) override;
+        // lacrima::ILogSink
+        void Write(const lacrima::LogMessage& message) override;
 
     private:
         std::vector<LogEntry>   m_entries;
@@ -43,3 +44,5 @@ namespace dt::editor
         char                    m_filterBuf[128] = {};
     };
 }
+
+

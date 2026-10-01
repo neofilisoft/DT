@@ -1,4 +1,5 @@
-﻿#pragma once
+// Copyright Neofilisoft. All Rights Reserved.
+#pragma once
 // ---------------------------------------------------------------------------
 // editor/export/BuildTool.h
 //
@@ -20,7 +21,7 @@
 #include <thread>
 #include <atomic>
 
-namespace dt::editor
+namespace lacrima::editor
 {
     enum class TargetPlatform
     {
@@ -62,3 +63,4 @@ namespace dt::editor
         bool                    m_autoScroll     = true;
     };
 }
+
